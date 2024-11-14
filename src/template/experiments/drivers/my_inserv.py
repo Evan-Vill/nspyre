@@ -26,7 +26,6 @@ nspyre_init_logger(
 with InstrumentServer() as local_inserv:
     # local_inserv.add('subs', _HERE / 'subsystems_driver.py', 'SubsystemsDriver', args=[local_inserv, remote_gw], local_args=True)
     
-    # TODO
     local_inserv.add(name = 'OXXIUS_Laser', 
                      class_path = _HERE / 'laser_driver.py', 
                      class_name = 'LaserControl',

@@ -43,7 +43,7 @@ def main():
         # Create the GUI.
         main_widget = MainWidget(
             {
-                'Test': MainWidgetItem(gui_test, 'PowerBar', stretch = (1, 1)),
+                # 'Test': MainWidgetItem(gui_test, 'PowerBar', stretch = (1, 1)),
                 'Instruments': MainWidgetItem(gui_all_instruments, 'InstWidget', stretch = (1, 1)),
                 'Experiments': MainWidgetItem(gui_experiments, 'ExpWidget', stretch = (1, 1)),
                 # 'Subsystems': MainWidgetItem(nspyre.gui.widgets.subsystem, 'SubsystemsWidget', args=[insmgr.subs.subsystems], stretch=(1, 1)),

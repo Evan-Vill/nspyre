@@ -23,7 +23,7 @@ from nspyre.misc.misc import run_experiment
 from nspyre import experiment_widget_process_queue
 from nspyre import InstrumentManager
 
-import nv_experiments
+import nv_experiments_sideband
 
 class CalcWidget(QWidget):
     
