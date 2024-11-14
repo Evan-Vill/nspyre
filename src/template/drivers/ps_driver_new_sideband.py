@@ -24,7 +24,7 @@ class Pulses():
     def __init__(self, laser_time = 15e3, initial_delay = 100, singlet_decay = 500, readout_time = 400, 
                  MW_buffer_time = 100, probe_time = 50e3, clock_time = 11, sampling_time = 50000, 
                  trig_spot = 50, awg_trig_time = 10, awg_pulse_delay = 0,
-                 rest_time_btw_seqs = 100e3, ip="10.135.70.12"):
+                 rest_time_btw_seqs = 100e3, ip="10.135.70.193"):
         '''
         :param channel_dict: Dictionary of which channels correspond to which instr controls
         :param readout_time: Laser+gate readout time in ns
