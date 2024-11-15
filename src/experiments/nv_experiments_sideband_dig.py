@@ -121,21 +121,26 @@ class SpinMeasurements:
         ni_sample_buffer = np.ascontiguousarray(np.zeros(buffer_size), dtype=np.float64)
         
         return [ni_sample_buffer]
-
-    def generate_buffer_9775(self, exp, runs = 0, num_pts = 0):
+    
+    def dig_generate_buffer(self, exp, runs, num_pts = 0, num_samples_in_segment = 1024):
         
         if exp == 'ODMR':
-            buffer_size = 2*runs
+            buffer_size = 2*runs*num_samples_in_segment
             if buffer_size < 2:
                 raise ValueError("Buffer size too small.")
         
-        elif exp == 'DEER':
-            buffer_size = 4*runs*num_pts
+        elif exp == 'DEER' or exp == 'DQ':
+            buffer_size = 4*runs*num_pts*num_samples_in_segment
             if buffer_size < 4:
                 raise ValueError("Buffer size too small.")
 
+        elif exp == 'CD':
+            buffer_size = 6*runs*num_pts*num_samples_in_segment
+            if buffer_size < 6:
+                raise ValueError("Buffer size too small.")
+            
         else: 
-            buffer_size = 2*runs*num_pts
+            buffer_size = 2*runs*num_pts*num_samples_in_segment
             if buffer_size < 2:
                 raise ValueError("Buffer size too small.")
             
@@ -737,8 +742,8 @@ class SpinMeasurements:
                         ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
                         rabi_result_raw = obtain(dig.acquire())
 
-                        print(np.shape(rabi_result_raw))
-                        print(type(rabi_result_raw))
+                        # print(np.shape(rabi_result_raw))
+                        # print(type(rabi_result_raw))
 
                         rabi_result = np.mean(rabi_result_raw, axis=1)
                     

@@ -121,27 +121,6 @@ class SpinMeasurements:
         
         return [ni_sample_buffer]
 
-    def generate_buffer_9775(self, exp, runs = 0, num_pts = 0):
-        
-        if exp == 'ODMR':
-            buffer_size = 2*runs
-            if buffer_size < 2:
-                raise ValueError("Buffer size too small.")
-        
-        elif exp == 'DEER':
-            buffer_size = 4*runs*num_pts
-            if buffer_size < 4:
-                raise ValueError("Buffer size too small.")
-
-        else: 
-            buffer_size = 2*runs*num_pts
-            if buffer_size < 2:
-                raise ValueError("Buffer size too small.")
-            
-        ni_sample_buffer = np.ascontiguousarray(np.zeros(buffer_size), dtype=np.float64)
-        
-        return [ni_sample_buffer]
-    
     def analog_math(self, array, exp_type, pts = 0):        
 
         # split up buffers array into signal data (MW ON) and background data (MW OFF)
