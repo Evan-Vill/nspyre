@@ -293,8 +293,38 @@ class HDAWG:
                 self.set_awg_oscillator_control('off')
 
                 self.control_both_groups = 0
-       
+
             case 'CW ODMR':           
+                odmr_side_freqs = kwargs['sideband_freqs'] # define frequency array
+                
+                # define the sideband frequencies for the ODMR experiment over range ("start", "stop", step defined by num_pts)
+                i_wave = [self.create_rect_wave("I", kwargs['probe_length']*self.sampling_rate, self.convert_mw_power(kwargs['sideband_power']))]
+                q_wave = [self.create_rect_wave("Q", kwargs['probe_length']*self.sampling_rate, self.convert_mw_power(kwargs['sideband_power']))]
+                
+                odmr_pulses: List[str] = []
+                
+                # loop through each sideband frequency, set lower frequency and output first then set upper frequency and output
+                for i in range(kwargs['num_pts']):
+                    odmr_pulses.append(f"""setDouble('oscs/0/freq', {odmr_side_freqs[i]}); 
+{self.set_sine_phase(0, kwargs['iq_phases'][0])}
+{self.set_sine_phase(1, kwargs['iq_phases'][1])}
+{self.create_iq_pulses(1, 1, "I", 2, "Q")} waitWave();""")
+                
+                # iter_repeat = [self.repeat(kwargs['iters'])] 
+                # runs_repeat = [self.repeat(kwargs['runs'])]
+                # iters_end = [f"}}}}"]
+                # self.awg_iq_program_text = "\n".join(i_wave + q_wave + iter_repeat + runs_repeat + odmr_pulses + iters_end)
+
+                inf_repeat = [self.repeat_inf()]
+                inf_end = [f"}}"]
+                self.awg_iq_program_text = "\n".join(i_wave + q_wave + inf_repeat + odmr_pulses + inf_end)
+
+                self.set_awg_oscillator_control('on')
+
+                self.control_both_groups = 0
+
+
+            case 'CW traditional ODMR':           
                 i_wave = [self.create_rect_wave("I", kwargs['probe_length']*self.sampling_rate, self.convert_mw_power(kwargs['sideband_power']))]
                 q_wave = [self.create_rect_wave("Q", kwargs['probe_length']*self.sampling_rate, self.convert_mw_power(kwargs['sideband_power']))]
 
@@ -1229,6 +1259,9 @@ repeat({kwargs['n']}){{
 
         return f"setSinePhase(0, {phase_offset + iq_phases[0]}); setSinePhase(1, {phase_offset + iq_phases[1]});"
 
+    def repeat_inf(self):
+        return f"while(true){{"
+    
     def repeat(self, var):
         return f"repeat({var}){{"
 

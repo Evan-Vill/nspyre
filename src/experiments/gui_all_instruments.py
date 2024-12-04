@@ -994,12 +994,12 @@ class InstWidget(QWidget):
     #         fun_kwargs = dict(**self.sg396_params_widget_1.all_params(), **self.sg396_params_widget_2.all_params())
     #         # print("power to emit:", fun_kwargs['RF_Power'])
     #         # print("freq to emit: ", fun_kwargs['RF_Frequency'])
-    #         mgr.SRS_SG396.set_frequency(fun_kwargs['RF_Frequency'])
-    #         mgr.SRS_SG396.set_rf_amplitude(fun_kwargs['RF_Power'])
-    #         mgr.SRS_SG396.set_mod_type('QAM')
-    #         mgr.SRS_SG396.set_mod_toggle(1)
-    #         mgr.SRS_SG396.set_rf_toggle(1)
-    #         mgr.SRS_SG396.set_mod_function('external')
+    #         mgr.sg.set_frequency(fun_kwargs['RF_Frequency'])
+    #         mgr.sg.set_rf_amplitude(fun_kwargs['RF_Power'])
+    #         mgr.sg.set_mod_type('QAM')
+    #         mgr.sg.set_mod_toggle(1)
+    #         mgr.sg.set_rf_toggle(1)
+    #         mgr.sg.set_mod_function('external')
 
     def sg396_checked(self, box):
         if box.isChecked() == True:
@@ -1040,8 +1040,8 @@ class InstWidget(QWidget):
     
     def sg396_emit_button_clicked(self):
         with InstrumentManager() as mgr:
-            sig_gen = mgr.SRS_SG396
-            hdawg = mgr.ZI_HDAWG
+            sig_gen = mgr.sg
+            hdawg = mgr.awg
 
             fun_kwargs = dict(**self.sg396_params_widget_1.all_params(), **self.sg396_params_widget_2.all_params())
             # print("power to emit:", fun_kwargs['RF_Power'])
@@ -1071,34 +1071,34 @@ class InstWidget(QWidget):
             
     def sg396_stop_button_clicked(self):
         with InstrumentManager() as mgr:
-            mgr.SRS_SG396.set_rf_toggle(0)
-            mgr.SRS_SG396.set_mod_toggle(0)
-            mgr.ZI_HDAWG.set_disabled()
+            mgr.sg.set_rf_toggle(0)
+            mgr.sg.set_mod_toggle(0)
+            mgr.awg.set_disabled()
 
             self.sg396_status_label.setStyleSheet("color: white; background-color: black; border: 4px solid black;")
             self.sg396_status_label.setText("SRS SG396 Status: OFF")
 
     def toggle_laser(self, b):
         with InstrumentManager() as mgr:
-            mgr.OXXIUS_Laser.set_modulation_state('cw')
-            mgr.OXXIUS_Laser.set_analog_control_mode('current')
-            mgr.OXXIUS_Laser.set_diode_current_realtime(self.laser_power)
+            mgr.laser.set_modulation_state('cw')
+            mgr.laser.set_analog_control_mode('current')
+            mgr.laser.set_diode_current_realtime(self.laser_power)
 
             match b.text():
                 case 'CW ON':
                     if b.isChecked() == True:
-                        mgr.OXXIUS_Laser.laser_on()
+                        mgr.laser.laser_on()
                     else:
-                        mgr.OXXIUS_Laser.laser_off()
+                        mgr.laser.laser_off()
                 case 'CW OFF':
                     if b.isChecked() == True:
-                        mgr.OXXIUS_Laser.laser_off()
+                        mgr.laser.laser_off()
                     else:
-                        mgr.OXXIUS_Laser.laser_on()
+                        mgr.laser.laser_on()
 
     def toggle_flipper(self, b):
         with InstrumentManager() as mgr:
-            daq = mgr.NI_DAQ
+            daq = mgr.daq
             daq.open_do_task('flip mirror')
             daq.start_do_task()
             
@@ -1113,7 +1113,7 @@ class InstWidget(QWidget):
 
     def pmt_shutter_status_changed(self):
         with InstrumentManager() as mgr:
-            daq = mgr.NI_DAQ
+            daq = mgr.daq
             daq.open_do_task('shutter')
             daq.start_do_task()
 
@@ -1131,11 +1131,11 @@ class InstWidget(QWidget):
         self.laser_power = self.laser_power_slider.value()
         self.laser_power_label.setText(str(self.laser_power) + "%")
         with InstrumentManager() as mgr:
-            mgr.OXXIUS_Laser.set_diode_current_realtime(self.laser_power)
+            mgr.laser.set_diode_current_realtime(self.laser_power)
 
     def laser_shutter_status_changed(self):
         with InstrumentManager() as mgr:
-            laser_shutter = mgr.THORLABS_Laser_Shutter
+            laser_shutter = mgr.laser_shutter
             
             if self.laser_shutter_button.text() == "Open laser shutter":
                 self.laser_shutter_button.setText("Close laser shutter")

@@ -1,0 +1,159 @@
+
+total_segments=kwargs['iters']*kwargs['runs']*kwargs['num_pts']*2
+
+rabi_result=np.mean(rabi_result_raw,axis=1)
+segments=(np.shape(rabi_result))[0]
+
+
+
+
+pbar.update(segments/total_segments)
+percent_completed = str(int(((i+1)/kwargs['iters'])*100))
+time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
+self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
+
+
+
+
+
+
+
+"""
+        Run a CW ODMR sweep over a set of microwave frequencies.
+
+        Keyword args:
+            dataset: name of the dataset to push data to
+            start (float): start frequency
+            stop (float): stop frequency
+            num_pts (int): number of points between start-stop (inclusive)
+            iterations: number of times to repeat the experiment
+        """
+        # connect to the instrument server & the data server.
+        # create a data set, or connect to an existing one with the same name if it was created earlier.
+        with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as cw_odmr_data:
+            # load devices used in scan
+            laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
+            sig_gen = mgr.sg
+            ps = mgr.ps
+            daq = mgr.daq
+            hdawg = mgr.awg
+            dig = mgr.dig
+            
+            # define parameter array that will be swept over in experiment & shuffle
+            frequencies = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])            
+            
+            # define NV drive frequency & sideband
+            frequencies_real, iq_phases = self.choose_sideband(kwargs['sideband'], frequencies, kwargs['sideband_freq'], 'y')
+
+            analog_mod_voltages = np.linspace(-1,1,kwargs['num_pts'])
+
+            # define pulse sequence
+            ps_seq = ps.CW_ODMR() # pulse streamer sequence for CW ODMR
+            ps.probe_time = kwargs['probe'] * 1e9
+
+            # configure digitizer
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
+            # configure signal generator for NV drive
+            sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
+            sig_gen.set_rf_amplitude(kwargs['rf_power']) # set MW power
+            sig_gen.set_mod_type(1) # quadrature amplitude modulation
+            sig_gen.set_mod_subtype(0) # no constellation mapping
+            sig_gen.set_mod_function('FM', 5) # external modulation
+            sig_gen.set_FM_mod_dev(16e6) 
+
+            sig_gen.set_mod_toggle(1) # turn on modulation mode
+
+            # run the experiment
+            # for storing the experiment data --> list of numpy arrays of shape (2, num_points)
+            signal_sweeps = StreamingList()
+            background_sweeps = StreamingList()
+
+            # sort sweep parameters back to proper plotting order
+            index_order = np.argsort(mw_times) 
+            mw_times_sorted = np.sort(mw_times) 
+
+            # open laser shutter
+            laser_shutter.open_shutter()
+            # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
+            time.sleep(0.5)
+
+            # upload digitizer parameters
+            dig.assign_param(dig_config)
+
+            # emit MW for NV drive
+            sig_gen.set_rf_toggle(1) # turn on NV signal generator
+
+            # configure laser settings and turn on
+            laser.set_modulation_state('cw')
+            laser.set_analog_control_mode('current')
+            laser.set_diode_current_realtime(kwargs['laser_power'])
+            laser.laser_on()
+
+            # set pulsestreamer to start on software trigger & run infinitely
+            ps.set_soft_trigger()
+            ps.stream(ps_seq, PulseStreamer.REPEAT_INFINITELY) #kwargs['runs']*kwargs['iters']) # execute chosen sequence on Pulse Streamer
+            
+            # start digitizer --> waits for trigger from pulse sequence
+            dig.config()
+            dig.start_buffer()
+            
+            # start pulse sequence
+            ps.start_now()
+
+            total_segments=kwargs['iters']*kwargs['runs']*kwargs['num_pts']*2
+
+            # start experiment loop
+            with tqdm(total = kwargs['iters']) as pbar:
+
+                for i in range(kwargs['iters']):
+                    
+                    odmr_result_raw = obtain(dig.acquire()) # acquire data from digitizer
+
+                    # average all data over each trigger/segment 
+                    odmr_result=np.mean(odmr_result_raw,axis=1)
+                    segments=(np.shape(odmr_result))[0]
+
+                    # partition buffer into signal and background datasets --> TODO: figure out which analog math func to use
+                    sig = self.analog_math(odmr_result, 'Rabi', kwargs['num_pts'])[0]
+                    bg = self.analog_math(odmr_result, 'Rabi', kwargs['num_pts'])[1]
+
+                    # take absolute value of voltages    
+                    # sig = np.abs(sig)
+                    # bg = np.abs(bg)
+
+                    # correct the y-axis data ordering for plots
+                    # sig = np.array([sig[i] for i in index_order])
+                    # bg = np.array([bg[i] for i in index_order])
+                    
+                    # notify the streaminglist that this entry has updated so it will be pushed to the data server
+                    signal_sweeps.append(np.stack([mw_times_sorted, sig]))
+                    signal_sweeps.updated_item(-1) 
+                    background_sweeps.append(np.stack([mw_times_sorted, bg]))
+                    background_sweeps.updated_item(-1)
+
+                    # save the current data to the data server
+                    cw_odmr_data.push({'params': {'kwargs': kwargs},
+                                        'title': 'CW Optically Detected Magnetic Resonance',
+                                        'xlabel': 'Frequency (GHz)',
+                                        'ylabel': 'Signal',
+                                        'datasets': {'signal' : signal_sweeps,
+                                                    'background': background_sweeps}})
+
+                    # update GUI progress bar                        
+                    pbar.update(segments/total_segments)
+                    percent_completed = str(int(((i+1)/kwargs['iters'])*100))
+                    time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
+                    self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
+
+            # save data if requested upon completion of experiment
+            if kwargs['save'] == True:
+                flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+
+        finally:
+            self.equipment_off() # turn off equipment regardless of if experiment started or failed
+
+
+

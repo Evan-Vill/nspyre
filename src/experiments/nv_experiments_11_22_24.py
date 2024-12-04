@@ -3,8 +3,13 @@ This is example script demonstrates most of the basic functionality of nspyre.
 """
 import time
 import logging
+# import spcm
+from spcm import units
 from pathlib import Path
 from typing import List
+
+from pulsestreamer import PulseStreamer
+
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -120,32 +125,6 @@ class SpinMeasurements:
         ni_sample_buffer = np.ascontiguousarray(np.zeros(buffer_size), dtype=np.float64)
         
         return [ni_sample_buffer]
-
-    def dig_generate_buffer(self, exp, runs, num_pts = 0, num_samples_in_segment = 1024):
-        
-        if exp == 'ODMR':
-            buffer_size = 2*runs*num_samples_in_segment
-            if buffer_size < 2:
-                raise ValueError("Buffer size too small.")
-        
-        elif exp == 'DEER' or exp == 'DQ':
-            buffer_size = 4*runs*num_pts*num_samples_in_segment
-            if buffer_size < 4:
-                raise ValueError("Buffer size too small.")
-
-        elif exp == 'CD':
-            buffer_size = 6*runs*num_pts*num_samples_in_segment
-            if buffer_size < 6:
-                raise ValueError("Buffer size too small.")
-            
-        else: 
-            buffer_size = 2*runs*num_pts*num_samples_in_segment
-            if buffer_size < 2:
-                raise ValueError("Buffer size too small.")
-            
-        ni_sample_buffer = np.ascontiguousarray(np.zeros(buffer_size), dtype=np.float64)
-        
-        return [ni_sample_buffer]
     
     def analog_math(self, array, exp_type, pts = 0):        
 
@@ -155,8 +134,8 @@ class SpinMeasurements:
         ana_bg = array[1::2]
 
         if exp_type == 'ODMR':
-            sum1 = np.mean(ana_sig) # MW ON - summed up dark data for plotting
-            sum2 = np.mean(ana_bg) # MW OFF - summed up bright data for plotting
+            sum1 = np.sum(ana_sig) # MW ON - summed up dark data for plotting
+            sum2 = np.sum(ana_bg) # MW OFF - summed up bright data for plotting
             
             return [sum1, sum2]
         
@@ -276,12 +255,16 @@ class SpinMeasurements:
     def equipment_off(self):
         with InstrumentManager() as mgr:
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             laser.laser_off()
+            laser_shutter.close_shutter()
+
             sig_gen.set_rf_toggle(0)
             sig_gen.set_mod_toggle(0)
 
@@ -289,6 +272,8 @@ class SpinMeasurements:
             daq.close_do_task()
             daq.close_ao_task()
             daq.close_ai_task()
+            dig.stop_card()
+            dig.reset()
             # hdawg.set_disabled()
 
     def choose_sideband(self, opt, nv_freq, side_freq, pulse_axis='x'):
@@ -311,37 +296,36 @@ class SpinMeasurements:
 
         return frequencies, iq_phases
     
-    ### Experiment logic
+    def digitizer_configure(self, **kwargs):
+        dig_config = {'num_pts_in_exp': 2*kwargs['num_pts_in_exp'], # MW ON + OFF subsequences
+                      'num_iters': kwargs['iters'], # number of exp. iterations
+                      'segment_size' : kwargs['segment_size'] ,
+                      'pretrig_size' : kwargs['pretrig_size'] ,
+                      'readout_ch' : int(kwargs['read_channel']),
+                      'runs' : kwargs['runs']}
+        # print("config params: ", dig_config)
 
-    def sigvstime_test_scan(self, **kwargs):
+        # dig_config={'num_pts_in_exp': int(2*kwargs['num_pts_in_exp']),
+        #                     # 'pretrig_size' : 32 * units.Sa,
+        #                     # 'segment_size' : 512 * units.Sa,
+        #                     'readout_ch' : 0,
+        #                     'runs' : int(kwargs['runs'])}
         
-        with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as sigvstime_data:
-            # run laser on continuously here from laser driver
-            daq = mgr.daq
+        # for key, value in dig_config.items():
+        #     print(f"{key}: {type(value)}")
 
-            daq.open_do_task('flip mirror')
-            daq.start_do_task()
-            daq.write_do_task('flip mirror', detector='pmt')
-            # daq.write_do_task('shutter', 'open')
-            # time.sleep(3)
-            # daq.write_do_task('shutter', 'closed')
-            daq.stop_do_task()
-            daq.close_do_task()
+        # print(dig_config.items)
 
-            # daq.open_ao_task() # one clock per each of the "n_runs" no. of sequences
-
-            # daq.start_ao_task()
-            # daq.write_ao_task(0)
-            
-            # daq.stop_ao_task()
-            # print("task stopped!")
-            # daq.close_ao_task()
+        return dig_config
+    
+    ### Experiment logic
 
     def sigvstime_scan(self, **kwargs):
         
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as sigvstime_data:
             # run laser on continuously here from laser driver
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             ps = mgr.ps
             daq = mgr.daq
 
@@ -357,8 +341,6 @@ class SpinMeasurements:
             time_start = time.time()
 
             signal_sweeps = StreamingList()
-            # PL_data = []
-            # t = []
 
             for i in range(10000):
                 print("Scan index ", i)
@@ -386,67 +368,16 @@ class SpinMeasurements:
                 #                      't': t, 
                 #                      'sig_data': PL_data})
                 
-                if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                    # the GUI has asked us nicely to exit. Save data if requested.
-                    if kwargs['save'] == True:
-                        flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-                    return
-            
-    # def oscilloscope_awg_delay_scan(self, **kwargs):
-    #     """
-    #     Run a CW ODMR sweep over a set of microwave frequencies.
-
-    #     Keyword args:
-    #         dataset: name of the dataset to push data to
-    #         start (float): start frequency
-    #         stop (float): stop frequency
-    #         num_pts (int): number of points between start-stop (inclusive)
-    #         iterations: number of times to repeat the experiment
-    #     """
-    #     # connect to the instrument server & the data server.
-    #     # create a data set, or connect to an existing one with the same name if it was created earlier.
-        
-    #     with InstrumentManager() as mgr:
-    #         # load devices used in ODMR scan
-    #         sig_gen = mgr.sg
-    #         ps = mgr.ps
-    #         hdawg = mgr.awg
- 
-    #         iq_phases = [0, 90]
-
-    #         sig_gen.set_rf_amplitude(kwargs['rf_power'])
-    #         sig_gen.set_frequency(2.87e9) # set signal generator frequency
-    #         sig_gen.set_mod_type('QAM')
-    #         sig_gen.set_mod_function('external')
-    #         sig_gen.set_mod_toggle(1)
-    #         sig_gen.set_rf_toggle(1)
-
-            
-    #         ps_seq = ps.Calibrate_AWG_IQ_offset() # pulse streamer sequence for CW ODMR
-  
-    #         try:
-    #             hdawg.set_sequence(**{'seq': 'Calibrate',
-    #                                 'i_offset': kwargs['i_offset'],
-    #                                 'q_offset': kwargs['q_offset'],
-    #                                 'sideband_power': kwargs['sideband_power'],
-    #                                 'sideband_freq': kwargs['sideband_freq'], 
-    #                                 'iq_phases': iq_phases,
-    #                                 'iters': kwargs['iters']})
+                # if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                #     # the GUI has asked us nicely to exit. Save data if requested.
+                #     if kwargs['save'] == True:
+                #         flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
                     
-    #             time.sleep(0.5)
-    #         except Exception as e:
-    #             print(e)
-    #         else:
-    #             with tqdm(total = kwargs['iters']) as pbar:
+                #     self.equipment_off()
 
-    #                 for i in range(kwargs['iters']):
-                        
-    #                     ps.stream(ps_seq, 1) # execute chosen sequence on Pulse Streamer
-    #                     ps.Pulser.reset()
+                #     return
 
-    #             self.equipment_off()
-
-    def odmr_scan(self, **kwargs):
+    def odmr_orig_scan(self, **kwargs):
         """
         Run a CW ODMR sweep over a set of microwave frequencies.
 
@@ -467,153 +398,15 @@ class SpinMeasurements:
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
-
-            # check to make sure number of points is even 
-            # assert kwargs['num_pts'] % 2 == 0 
-
-            # define NV drive frequency & sideband           
-            delta = 0
-            iq_phases = [delta+0, delta+90] # set IQ phase relations for lower sideband [lower I, lower Q]
-                
-            sig_gen_freq = kwargs['freq'] # set freq to sig gen 
-
-            max_sideband_freq = kwargs['max_sideband_freq'] # set span of ODMR sweep as max sideband modulation frequency --> 100 MHz max. for SG396 IQ bandwidth
-
-            # define parameter array that will be swept over in experiment & shuffle
-            mod_freqs = np.linspace(max_sideband_freq, max_sideband_freq, kwargs['num_pts'])            
-            
-            np.random.shuffle(mod_freqs)
-            
-            real_freqs = sig_gen_freq - mod_freqs
-
-            # define pulse sequence
-            ps_seq = ps.CW_ODMR(kwargs['num_pts']) # pulse streamer sequence for CW ODMR
-            ps.probe_time = kwargs['probe'] * 1e9
-
-            # Generate ODMR data buffer
-            odmr_buffer = self.generate_buffer('Rabi', kwargs['runs'], kwargs['num_pts'])
-            
-            # updated signal generator settings to include carrier freq
-            sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
-            sig_gen.set_rf_amplitude(kwargs['rf_power'])
-            sig_gen.set_mod_type('QAM')
-            sig_gen.set_mod_function('external')
-            sig_gen.set_mod_toggle(1)
-            
-            ps.probe_time = kwargs['probe'] * 1e9
-            ps_seq = ps.CW_ODMR(kwargs['num_pts']) # pulse streamer sequence for CW ODMR
-  
-            try:               
-                hdawg.set_sequence(**{'seq': 'CW ODMR',
-                                    'i_offset': kwargs['i_offset'],
-                                    'q_offset': kwargs['q_offset'],
-                                    'probe_length': kwargs['probe'], 
-                                    'sideband_power': kwargs['sideband_power'],
-                                    'sideband_freqs': mod_freqs, 
-                                    'iq_phases': iq_phases,
-                                    'num_pts': kwargs['num_pts'],
-                                    'runs': kwargs['runs'], 
-                                    'iters': kwargs['iters']})
-                
-                time.sleep(0.5)
-            except Exception as e:
-                print(e)
-            else:
-                daq.open_ai_task(kwargs['detector'], len(odmr_buffer[0]))
-
-                # for storing the experiment data
-                # list of numpy arrays of shape (2, num_points)
-                signal_sweeps = StreamingList()
-                background_sweeps = StreamingList()
-
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(real_freqs) 
-                freqs_sorted = np.sort(real_freqs)
-
-                sig_gen.set_rf_toggle(1) # turn on NV signal generator
-
-                # configure devices used in scan
-                laser.set_modulation_state('cw')
-                laser.set_analog_control_mode('current')
-                laser.set_diode_current_realtime(kwargs['laser_power'])
-                laser.laser_on()
-
-                with tqdm(total = kwargs['iters']) as pbar:
-                    
-                    for i in range(kwargs['iters']):
-                        
-                        # read samples to buffer
-                        odmr_result = read(odmr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
-                            
-                        # partition buffer into signal and background datasets
-                        sig = self.analog_math(odmr_result, 'Rabi', kwargs['num_pts'])[0]
-                        bg = self.analog_math(odmr_result, 'Rabi', kwargs['num_pts'])[1]
-                        
-                        sig = np.abs(sig)
-                        bg = np.abs(bg)
-
-                        # correct the y-axis data ordering for plots
-                        sig = np.array([sig[i] for i in index_order])
-                        bg = np.array([bg[i] for i in index_order])
-                        
-                        # read the analog voltage levels received by the APD.
-                        # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        
-                        signal_sweeps.append(np.stack([freqs_sorted/1e9, sig]))
-                        signal_sweeps.updated_item(-1) 
-                        background_sweeps.append(np.stack([freqs_sorted/1e9, bg]))
-                        background_sweeps.updated_item(-1)
-
-                        # save the current data to the data server.
-                        cw_odmr_data.push({'params': {'kwargs': kwargs},
-                                        'title': 'CW Optically Detected Magnetic Resonance',
-                                        'xlabel': 'Frequency (GHz)',
-                                        'ylabel': 'Signal',
-                                        'datasets': {'signal' : signal_sweeps,
-                                                    'background': background_sweeps}})
-
-                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                            # the GUI has asked us nicely to exit. Save data if requested.
-                            if kwargs['save'] == True:
-                                flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-                            return
-
-                        pbar.update(1)
-                        percent_completed = str(int(((i+1)/kwargs['iters'])*100))
-                        time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
-                        self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
-                
-                # Automatically save data if action requested.
-                if kwargs['save'] == True:
-                    flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-                
-                self.equipment_off()
-
-    def odmr_traditional_scan(self, **kwargs):
-        """
-        Run a CW ODMR sweep over a set of microwave frequencies.
-
-        Keyword args:
-            dataset: name of the dataset to push data to
-            start (float): start frequency
-            stop (float): stop frequency
-            num_pts (int): number of points between start-stop (inclusive)
-            iterations: number of times to repeat the experiment
-        """
-        # connect to the instrument server & the data server.
-        # create a data set, or connect to an existing one with the same name if it was created earlier.
-        
-        with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as cw_odmr_data:
-            # load devices used in ODMR scan
-            laser = mgr.laser
-            sig_gen = mgr.sg
-            ps = mgr.ps
-            daq = mgr.daq
-            hdawg = mgr.awg
+            dig = mgr.dig
 
             # Generate ODMR data buffer
             odmr_buffer = self.generate_buffer('ODMR', kwargs['runs'])
-            
+
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+
+
             # frequencies that will be swept over in the ODMR measurement
             frequencies = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])            
             
@@ -625,10 +418,10 @@ class SpinMeasurements:
             sig_gen.set_mod_toggle(1)
             
             ps.probe_time = kwargs['probe'] * 1e9
-            ps_seq = ps.CW_traditional_ODMR() # pulse streamer sequence for CW ODMR
+            ps_seq = ps.CW_ODMR() # pulse streamer sequence for CW ODMR
   
             try:
-                hdawg.set_sequence(**{'seq': 'CW traditional ODMR',
+                hdawg.set_sequence(**{'seq': 'CW ODMR',
                                     'i_offset': kwargs['i_offset'],
                                     'q_offset': kwargs['q_offset'],
                                     'probe_length': kwargs['probe'], 
@@ -644,6 +437,8 @@ class SpinMeasurements:
                 print(e)
             else:
                 daq.open_ai_task(kwargs['detector'], len(odmr_buffer[0]))
+
+                dig.assign_param(dig_config)
 
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
@@ -674,8 +469,13 @@ class SpinMeasurements:
 
                             sig_gen.set_frequency(freq) # set signal generator frequency
                             
-                            # read samples to buffer
-                            odmr_result = read(odmr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                            dig.config()
+                            dig.start_buffer()
+                            ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                            odmr_result_raw = obtain(dig.acquire())
+                            
+                            odmr_result = np.mean(odmr_result_raw, axis=1)
                                 
                             # partition buffer into signal and background datasets
                             sig = self.analog_math(odmr_result, 'ODMR')[0]
@@ -700,6 +500,9 @@ class SpinMeasurements:
                                 # the GUI has asked us nicely to exit. Save data if requested.
                                 if kwargs['save'] == True:
                                     flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                                
+                                self.equipment_off()
+
                                 return
 
                         pbar.update(1)
@@ -714,57 +517,146 @@ class SpinMeasurements:
                 self.equipment_off()
 
 
-    # def rabi_test_rf_toggle_problem_scan(self, **kwargs):
-    #     """
-    #     Run a Rabi sweep over a set of microwave pulse durations.
+    def odmr_scan(self, **kwargs):
+        """
+        Run a CW ODMR sweep over a set of microwave frequencies.
 
-    #     Keyword args:
-    #         dataset: name of the dataset to push data to
-    #         start (float): start frequency
-    #         stop (float): stop frequency
-    #         num_pts (int): number of points between start-stop (inclusive)
-    #         iterations: number of times to repeat the experiment
-    #     """
-    #     # connect to the instrument server & the data server.
-    #     # create a data set, or connect to an existing one with the same name if it was created earlier.
-    #     with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as rabi_data:
-    #         # load devices used in scan
-    #         laser = mgr.laser
-    #         sig_gen = mgr.sg
-    #         ps = mgr.ps
-    #         daq = mgr.daq
-    #         hdawg = mgr.awg
-
-    #         # Generate Rabi data buffer
-    #         rabi_buffer = self.generate_buffer('Rabi', kwargs['runs'], kwargs['num_pts'])
-            
-    #         # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
-    #         mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
-    #         np.random.shuffle(mw_times)
-
-    #         sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq'], kwargs['pulse_axis'])
+        Keyword args:
+            dataset: name of the dataset to push data to
+            start (float): start frequency
+            stop (float): stop frequency
+            num_pts (int): number of points between start-stop (inclusive)
+            iterations: number of times to repeat the experiment
+        """
+        # connect to the instrument server & the data server.
+        # create a data set, or connect to an existing one with the same name if it was created earlier.
         
-    #         # ps.laser_time = kwargs['init'] * 1e9 # initialization pulse duration
-    #         # ps.readout_time = kwargs['read'] * 1e9 # readout window duration
+        with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as cw_odmr_data:
+            # load devices used in ODMR scan
+            laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
+            sig_gen = mgr.sg
+            ps = mgr.ps
+            daq = mgr.daq
+            hdawg = mgr.awg
+            dig = mgr.dig
 
-    #         # if kwargs['rabi_type'] == "SRS":
+            # Generate ODMR data buffer
+            odmr_buffer = self.generate_buffer('ODMR', kwargs['runs'])
 
-    #         ps_seq = ps.Rabi(mw_times) # pulse streamer sequence
-    #         # ps_seq = ps.Calibrate_SingletDecay(mw_times, 80) 
-
-    #         sig_gen.set_frequency(sig_gen_freq) # set SG396 carrier frequency to drive NVs at selected sideband
-    #         sig_gen.set_rf_amplitude(kwargs['rf_power'])
-    #         sig_gen.set_mod_type('QAM')
-    #         sig_gen.set_mod_function('external')
-    #         sig_gen.set_mod_toggle(1)
-    #         sig_gen.set_rf_toggle(1)
-    #         sig_gen.set_rf_toggle(0)            
-    #         sig_gen.set_mod_toggle(0)
-    #         print("DONE TEST")
-
-    #         self.equipment_off()
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
 
 
+            # frequencies that will be swept over in the ODMR measurement
+            frequencies = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])            
+            
+            frequencies_real, iq_phases = self.choose_sideband(kwargs['sideband'], frequencies, kwargs['sideband_freq'], 'y')
+
+            sig_gen.set_rf_amplitude(kwargs['rf_power'])
+            sig_gen.set_mod_type('Sweep')
+            sig_gen.set_mod_function('triangle')
+            sig_gen.set_mod_rate(120)
+            sig_gen.set_mod_toggle(1)
+            
+            ps.probe_time = kwargs['probe'] * 1e9
+            ps_seq = ps.CW_ODMR() # pulse streamer sequence for CW ODMR
+  
+            try:
+                hdawg.set_sequence(**{'seq': 'CW ODMR',
+                                    'i_offset': kwargs['i_offset'],
+                                    'q_offset': kwargs['q_offset'],
+                                    'probe_length': kwargs['probe'], 
+                                    'sideband_power': kwargs['sideband_power'],
+                                    'sideband_freq': kwargs['sideband_freq'], 
+                                    'iq_phases': iq_phases,
+                                    'num_pts': kwargs['num_pts'],
+                                    'runs': kwargs['runs'], 
+                                    'iters': kwargs['iters']})
+                    
+                time.sleep(0.5)
+            except Exception as e:
+                print(e)
+            else:
+                daq.open_ai_task(kwargs['detector'], len(odmr_buffer[0]))
+
+                dig.assign_param(dig_config)
+
+                # for storing the experiment data
+                # list of numpy arrays of shape (2, num_points)
+                signal_sweeps = StreamingList()
+                background_sweeps = StreamingList()
+
+                sig_gen.set_rf_toggle(1) # turn on NV signal generator
+
+                # configure devices used in scan
+                laser.set_modulation_state('cw')
+                laser.set_analog_control_mode('current')
+                laser.set_diode_current_realtime(kwargs['laser_power'])
+                laser.laser_on()
+
+                with tqdm(total = kwargs['iters']) as pbar:
+
+                    for i in range(kwargs['iters']):
+
+                        sig_array = np.empty(kwargs['num_pts'])
+                        sig_array[:] = np.nan
+                        signal_sweeps.append(np.stack([frequencies/1e9, sig_array]))
+
+                        bg_array = np.empty(kwargs['num_pts'])
+                        bg_array[:] = np.nan
+                        background_sweeps.append(np.stack([frequencies/1e9, bg_array]))
+
+                        for f, freq in enumerate(frequencies_real):
+
+                            sig_gen.set_frequency(freq) # set signal generator frequency
+                            
+                            dig.config()
+                            dig.start_buffer()
+                            ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                            odmr_result_raw = obtain(dig.acquire())
+                            
+                            odmr_result = np.mean(odmr_result_raw, axis=1)
+                                
+                            # partition buffer into signal and background datasets
+                            sig = self.analog_math(odmr_result, 'ODMR')[0]
+                            bg = self.analog_math(odmr_result, 'ODMR')[1]
+                            
+                            # read the analog voltage levels received by the APD.
+                            # notify the streaminglist that this entry has updated so it will be pushed to the data server
+                            signal_sweeps[-1][1][f] = sig 
+                            signal_sweeps.updated_item(-1) 
+                            background_sweeps[-1][1][f] = bg
+                            background_sweeps.updated_item(-1)
+
+                            # save the current data to the data server.
+                            cw_odmr_data.push({'params': {'kwargs': kwargs},
+                                            'title': 'CW Optically Detected Magnetic Resonance',
+                                            'xlabel': 'Frequency (GHz)',
+                                            'ylabel': 'Signal',
+                                            'datasets': {'signal' : signal_sweeps,
+                                                        'background': background_sweeps}})
+
+                            if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
+                                # the GUI has asked us nicely to exit. Save data if requested.
+                                if kwargs['save'] == True:
+                                    flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                                
+                                self.equipment_off()
+
+                                return
+
+                        pbar.update(1)
+                        percent_completed = str(int(((i+1)/kwargs['iters'])*100))
+                        time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
+                        self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
+                
+                # Automatically save data if action requested.
+                if kwargs['save'] == True:
+                    flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                
+                self.equipment_off()
 
     def rabi_scan(self, **kwargs):
         """
@@ -782,42 +674,36 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as rabi_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
-
-            # Generate Rabi data buffer
-            rabi_buffer = self.generate_buffer('Rabi', kwargs['runs'], kwargs['num_pts'])
+            dig = mgr.dig
             
-            # pi pulse durations that will be swept over in the Rabi measurement (converted to ns)
+            # define parameter array that will be swept over in experiment & shuffle
             mw_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
             np.random.shuffle(mw_times)
 
+            # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq'], kwargs['pulse_axis'])
-        
-            # ps.laser_time = kwargs['init'] * 1e9 # initialization pulse duration
-            # ps.readout_time = kwargs['read'] * 1e9 # readout window duration
 
-            # if kwargs['rabi_type'] == "SRS":
-
+            # define pulse sequence
             ps_seq = ps.Rabi(mw_times) # pulse streamer sequence
-            # ps_seq = ps.Calibrate_SingletDecay(mw_times, 80) 
 
-            sig_gen.set_frequency(sig_gen_freq) # set SG396 carrier frequency to drive NVs at selected sideband
-            sig_gen.set_rf_amplitude(kwargs['rf_power'])
-            sig_gen.set_mod_type('QAM')
-            sig_gen.set_mod_function('external')
-            sig_gen.set_mod_toggle(1)
+            # configure digitizer
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
+            # configure signal generator for NV drive
+            sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
+            sig_gen.set_rf_amplitude(kwargs['rf_power']) # set MW power
+            sig_gen.set_mod_type(7) # quadrature amplitude modulation
+            sig_gen.set_mod_subtype(1) # no constellation mapping
+            sig_gen.set_mod_function('IQ', 5) # external modulation
+            sig_gen.set_mod_toggle(1) # turn on modulation mode
 
-            # else:
-            #     print("RUNNING AWG RABI")
-            #     ps_seq = ps.Rabi_AWG(mw_times, kwargs['pulse_axis'])
-            #     # AWG pulse resolution 
-            #     awg_sampling_rate = 2.4e9 # [Hz]
-            #     # print(np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])*awg_sampling_rate)
-            #     stop_point_samples = kwargs['stop']*awg_sampling_rate
-
+            # upload AWG sequence first
             try:
                 hdawg.set_sequence(**{'seq': 'Rabi',
                                     'i_offset': kwargs['i_offset'],
@@ -828,53 +714,66 @@ class SpinMeasurements:
                                     'pi_pulses': mw_times/1e9, 
                                     'num_pts': kwargs['num_pts'],
                                     'runs': kwargs['runs'], 
-                                    'iters': kwargs['iters']})
-
-                # for singlet decay calibration
-                # hdawg.set_sequence(**{'seq': 'Calibrate',
-                #                     'i_offset': kwargs['i_offset'],
-                #                     'q_offset': kwargs['q_offset'],
-                #                     'sideband_power': kwargs['sideband_power'],
-                #                     'sideband_freq': kwargs['sideband_freq'], 
-                #                     'iq_phases': iq_phases,
-                #                     'pi': 80/1e9, 
-                #                     'num_pts': kwargs['num_pts'],
-                #                     'runs': kwargs['runs'], 
-                #                     'iters': kwargs['iters']})
-                 
+                                    'iters': kwargs['iters']})  
                 time.sleep(0.5)
+
             except Exception as e:
                 print(e)
+            
+            # if successfully uploaded, run the experiment
             else:
-                daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
-
-                # for storing the experiment data
-                # list of numpy arrays of shape (2, num_points)
+                # for storing the experiment data --> list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
                 background_sweeps = StreamingList()
 
+                # sort sweep parameters back to proper plotting order
                 index_order = np.argsort(mw_times) 
-                mw_times_sorted = np.sort(mw_times) # order mw_times for Rabi plotting
+                mw_times_sorted = np.sort(mw_times) 
 
+                # open laser shutter
+                laser_shutter.open_shutter()
+                # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
+                time.sleep(0.5)
+
+                # upload digitizer parameters
+                dig.assign_param(dig_config)
+
+                # emit MW for NV drive
                 sig_gen.set_rf_toggle(1) # turn on NV signal generator
 
-                # configure devices used in scan
+                # configure laser settings and turn on
                 laser.set_modulation_state('pulsed')
                 laser.set_analog_control_mode('current')
                 laser.set_diode_current_realtime(kwargs['laser_power'])
                 laser.laser_on()
 
+                # set pulsestreamer to start on software trigger & run infinitely
+                ps.set_soft_trigger()
+                ps.stream(ps_seq, PulseStreamer.REPEAT_INFINITELY) #kwargs['runs']*kwargs['iters']) # execute chosen sequence on Pulse Streamer
+                
+                # start digitizer --> waits for trigger from pulse sequence
+                dig.config()
+                dig.start_buffer()
+                
+                # start pulse sequence
+                ps.start_now()
+
+                dig_num_to_avg = 512//1 # number of digitizer samples per trigger to average over
+                total_segments=kwargs['iters']*kwargs['runs']*kwargs['num_pts']*2
+                # start experiment loop
                 with tqdm(total = kwargs['iters']) as pbar:
 
                     for i in range(kwargs['iters']):
                         
-                        # read samples to buffer
-                        rabi_result = read(rabi_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
-                            
+                        rabi_result_raw = obtain(dig.acquire()) # acquire data from digitizer
+                        rabi_result=np.mean(rabi_result_raw,axis=1)
+                        segments=(np.shape(rabi_result))[0]
+
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(rabi_result, 'Rabi', kwargs['num_pts'])[0]
                         bg = self.analog_math(rabi_result, 'Rabi', kwargs['num_pts'])[1]
-                        
+
+                        # take absolute value of voltages    
                         sig = np.abs(sig)
                         bg = np.abs(bg)
 
@@ -882,15 +781,13 @@ class SpinMeasurements:
                         sig = np.array([sig[i] for i in index_order])
                         bg = np.array([bg[i] for i in index_order])
                         
-                        # read the analog voltage levels received by the APD.
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        
                         signal_sweeps.append(np.stack([mw_times_sorted, sig]))
                         signal_sweeps.updated_item(-1) 
                         background_sweeps.append(np.stack([mw_times_sorted, bg]))
                         background_sweeps.updated_item(-1)
 
-                        # save the current data to the data server.
+                        # save the current data to the data server
                         rabi_data.push({'params': {'kwargs': kwargs},
                                         'title': 'Rabi Oscillation',
                                         'xlabel': 'MW Pulse Duration (ns)',
@@ -899,134 +796,19 @@ class SpinMeasurements:
                                                     'background': background_sweeps}
                         })
 
-                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                            # the GUI has asked us nicely to exit
-                            if kwargs['save'] == True:
-                                flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-                            return
-                        
-                        pbar.update(1)
+                        # update GUI progress bar                        
+                        pbar.update(segments/total_segments)
                         percent_completed = str(int(((i+1)/kwargs['iters'])*100))
-                        
                         time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
                         self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
 
+                # save data if requested upon completion of experiment
                 if kwargs['save'] == True:
                     flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
 
-                self.equipment_off()
+            finally:
+                self.equipment_off() # turn off equipment regardless of if experiment started or failed
 
-    def pulsed_odmr_scan(self, **kwargs):
-        """
-        Run a pulsed ODMR sweep over a set of microwave frequencies.
-
-        Keyword args:
-            dataset: name of the dataset to push data to
-            start (float): start frequency
-            stop (float): stop frequency
-            num_pts (int): number of points between start-stop (inclusive)
-            iterations: number of times to repeat the experiment
-        """
-        # connect to the instrument server & the data server.
-        # create a data set, or connect to an existing one with the same name if it was created earlier.
-        
-        with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as odmr_data:
-            # load devices used in ODMR scan
-            laser = mgr.laser
-            sig_gen = mgr.sg
-            ps = mgr.ps
-            daq = mgr.daq
-            hdawg = mgr.awg
-
-            # Generate ODMR data buffer
-            odmr_buffer = self.generate_buffer('ODMR', kwargs['runs'])
-            
-            # frequencies that will be swept over in the ODMR measurement
-            frequencies = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])            
-
-            # configure devices used in scan
-            sig_gen.set_rf_amplitude(kwargs['rf_power'])
-            sig_gen.set_mod_type('QAM')
-            sig_gen.set_mod_function('external')
-            sig_gen.set_mod_toggle(1)
-            
-            if kwargs['odmr_type'] == 'CW':
-                # ps.probe_time = kwargs['probe'] * 1e9
-                ps_seq = ps.CW_ODMR() # pulse streamer sequence for CW ODMR
-            else:
-                laser.set_modulation_state('Pulsed')
-                # ps.laser_time = kwargs['init'] * 1e9 # initialization pulse duration
-                # ps.readout_time = kwargs['read'] * 1e9 # readout window duration
-                ps_seq = ps.Pulsed_ODMR(kwargs['runs'], kwargs['pulse_axis'], kwargs['pi']*1e9) # pulse streamer sequence for Pulsed ODMR
-  
-            daq.open_ai_task(kwargs['detector'], len(odmr_buffer[0]))
-
-            # for storing the experiment data
-            # list of numpy arrays of shape (2, num_points)
-            signal_sweeps = StreamingList()
-            background_sweeps = StreamingList()
-
-            sig_gen.set_rf_toggle(1) # turn on NV signal generator
-
-            laser.set_modulation_state('cw')
-            laser.set_analog_control_mode('current')
-            laser.set_diode_current_realtime(kwargs['laser_power'])
-            laser.laser_on()
-            
-            with tqdm(total = kwargs['iters']) as pbar:
-
-                for i in range(kwargs['iters']):
-
-                    sig_array = np.empty(kwargs['num_pts'])
-                    sig_array[:] = np.nan
-                    signal_sweeps.append(np.stack([frequencies/1e9, sig_array]))
-
-                    bg_array = np.empty(kwargs['num_pts'])
-                    bg_array[:] = np.nan
-                    background_sweeps.append(np.stack([frequencies/1e9, bg_array]))
-
-                    for f, freq in enumerate(frequencies):
-
-                        sig_gen.set_frequency(freq) # set signal generator frequency
-                        
-                        # read samples to buffer
-                        odmr_result = read(odmr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
-                            
-                        # partition buffer into signal and background datasets
-                        sig = self.analog_math(odmr_result, 'ODMR')[0]
-                        bg = self.analog_math(odmr_result, 'ODMR')[1]
-                        
-                        # read the analog voltage levels received by the APD.
-                        # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        signal_sweeps[-1][1][f] = sig 
-                        signal_sweeps.updated_item(-1) 
-                        background_sweeps[-1][1][f] = bg
-                        background_sweeps.updated_item(-1)
-
-                        # save the current data to the data server.
-                        odmr_data.push({'params': {'kwargs': kwargs},
-                                        'title': 'Optically Detected Magnetic Resonance',
-                                        'xlabel': 'Frequency (GHz)',
-                                        'ylabel': 'Signal',
-                                        'datasets': {'signal' : signal_sweeps,
-                                                    'background': background_sweeps}})
-
-                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                            # the GUI has asked us nicely to exit. Save data if requested.
-                            if kwargs['save'] == True:
-                                flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-                            return
-
-                    pbar.update(1)
-                    percent_completed = str(int(((i+1)/kwargs['iters'])*100))
-                    time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
-                    self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
-            
-            # Automatically save data if action requested.
-            if kwargs['save'] == True:
-                flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-            
-            self.equipment_off()
 
     def OPT_T1_scan(self, **kwargs):
         """
@@ -1044,10 +826,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as t1_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             match kwargs['array_type']:
                 case 'geomspace':
@@ -1056,6 +840,10 @@ class SpinMeasurements:
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
             
             t1_buffer = self.generate_buffer('Opt T1', kwargs['runs'], kwargs['num_pts'])
+            
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             ps_seq = ps.Optical_T1(tau_times)
 
             # configure devices used in scan
@@ -1069,6 +857,8 @@ class SpinMeasurements:
 
             daq.open_ai_task(kwargs['detector'], len(t1_buffer[0]))
 
+            dig.assign_param(dig_config)
+
             # index_order = np.argsort(sorted_taus) 
 
             # for storing the experiment data
@@ -1080,9 +870,14 @@ class SpinMeasurements:
 
                 for i in range(kwargs['iters']):
                     
-                    # read samples to buffer
-                    t1_result = read(t1_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                    dig.config()
+                    dig.start_buffer()
+                    ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
 
+                    t1_result_raw = obtain(dig.acquire())
+                    
+                    t1_result = np.mean(t1_result_raw, axis=1)
+                    
                     # partition buffer into signal and background datasets
                     sig = self.analog_math(t1_result, 'MW_T1', kwargs['num_pts'])[0]
                     bg = self.analog_math(t1_result, 'MW_T1', kwargs['num_pts'])[1]
@@ -1109,6 +904,9 @@ class SpinMeasurements:
                         # the GUI has asked us nicely to exit
                         if kwargs['save'] == True:
                             flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                        
+                        self.equipment_off()
+
                         return
                     
                     pbar.update(1)
@@ -1137,45 +935,43 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as t1_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
-
+            dig = mgr.dig
+            
+            # define parameter array that will be swept over in experiment & shuffle
             match kwargs['array_type']:
                 case 'geomspace':
                     tau_times = np.geomspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
                 case 'linspace':
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
 
-            # np.random.shuffle(tau_times)
+            np.random.shuffle(tau_times)
 
-            # Generate Rabi data buffer
-            t1_buffer = self.generate_buffer('MW T1', kwargs['runs'], kwargs['num_pts'])
-            # print('length buffer = ', len(t1_buffer[0]))
-
+            # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq'], kwargs['pulse_axis'])
 
             pi_pulse = kwargs['pi']*1e9 # [ns] units for pulse streamer
 
-            # set initial parameters for instrument server devices
-            # configure devices used in scan
-            sig_gen.set_frequency(sig_gen_freq)
-            sig_gen.set_rf_amplitude(kwargs['rf_power'])
-            sig_gen.set_mod_type('QAM')
-            sig_gen.set_mod_function('external')
-            sig_gen.set_mod_toggle(1)            
+            # define pulse sequence
             ps_seq = ps.Diff_T1(tau_times, kwargs['pulse_axis'], pi_pulse)
 
-            # elif kwargs['seq'] == 'Optical T1':
-            #     t1_buffer = self.generate_buffer('Opt T1', kwargs['runs'], kwargs['num_pts'])
-            #     ps_seq = ps.Optical_T1(tau_times)
-
+            # configure digitizer
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
             
-        
-            # ps.laser_time = kwargs['init'] * 1e9 # initialization pulse duration
-            # ps.readout_time = kwargs['read'] * 1e9 # readout window duration
+            # configure signal generator for NV drive
+            sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
+            sig_gen.set_rf_amplitude(kwargs['rf_power']) # set MW power
+            sig_gen.set_mod_type(7) # quadrature amplitude modulation
+            sig_gen.set_mod_subtype(1) # no constellation mapping
+            sig_gen.set_mod_function('IQ', 5) # external modulation
+            sig_gen.set_mod_toggle(1) # turn on modulation mode
 
+            # upload AWG sequence first
             try:
                 hdawg.set_sequence(**{'seq': 'T1',
                                     'i_offset': kwargs['i_offset'],
@@ -1186,52 +982,83 @@ class SpinMeasurements:
                                     'pi_pulse': pi_pulse/1e9, 
                                     'num_pts': kwargs['num_pts'],
                                     'runs': kwargs['runs'], 
-                                    'iters': kwargs['iters']})
+                                    'iters': kwargs['iters']})  
                 time.sleep(0.5)
+
             except Exception as e:
                 print(e)
+            
+            # if successfully uploaded, run the experiment
             else:
-                daq.open_ai_task(kwargs['detector'], len(t1_buffer[0]))
-
-                # for storing the experiment data
-                # list of numpy arrays of shape (2, num_points)
+                # for storing the experiment data --> list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
                 background_sweeps = StreamingList()
 
-                # index_order = np.argsort(tau_times) 
-                # tau_times_sorted = np.sort(tau_times) # order mw_times for T1 plotting
-                
+                # sort sweep parameters back to proper plotting order
+                index_order = np.argsort(tau_times) 
+                tau_times_sorted = np.sort(tau_times) # order mw_times for T1 plotting 
+
+                # open laser shutter
+                laser_shutter.open_shutter()
+                # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
+                time.sleep(0.5)
+
+                # upload digitizer parameters
+                dig.assign_param(dig_config)
+
+                # emit MW for NV drive
                 sig_gen.set_rf_toggle(1) # turn on NV signal generator
 
+                # configure laser settings and turn on
                 laser.set_modulation_state('pulsed')
                 laser.set_analog_control_mode('current')
                 laser.set_diode_current_realtime(kwargs['laser_power'])
                 laser.laser_on()
 
+                # set pulsestreamer to start on software trigger & run infinitely
+                ps.set_soft_trigger()
+                ps.stream(ps_seq, PulseStreamer.REPEAT_INFINITELY) #kwargs['runs']*kwargs['iters']) # execute chosen sequence on Pulse Streamer
+                
+                # start digitizer --> waits for trigger from pulse sequence
+                dig.config()
+                dig.start_buffer()
+                
+                # start pulse sequence
+                ps.start_now()
+
+                dig_num_to_avg = 512//1 # number of digitizer samples per trigger to average over
+
+                # start experiment loop
                 with tqdm(total = kwargs['iters']) as pbar:
 
                     for i in range(kwargs['iters']):
                         
-                        # read samples to buffer
-                        t1_result = read(t1_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        t1_result_raw = obtain(dig.acquire()) # acquire data from digitizer
+
+                        # define dummy array to contain experiment data --> size (runs*num_pts) --> (segment_size)
+                        t1_result = np.zeros(len(t1_result_raw)//dig_num_to_avg)
+                        for i in range(0,len(t1_result_raw)//dig_num_to_avg):
+                            t1_result[i] = np.mean(t1_result_raw[i*dig_num_to_avg:(i+1)*dig_num_to_avg])
 
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(t1_result, 'MW_T1', kwargs['num_pts'])[0]
                         bg = self.analog_math(t1_result, 'MW_T1', kwargs['num_pts'])[1]
-                        
+
+                        # take absolute value of voltages    
                         sig = np.abs(sig)
                         bg = np.abs(bg)
-                        # correct the y-axis data ordering for plots
-                        # sig = np.array([sig[i] for i in index_order])
-                        # bg = np.array([bg[i] for i in index_order])
 
-                        # notify the streaminglist that this entry has updated so it will be pushed to the data server                    
-                        signal_sweeps.append(np.stack([tau_times[1:]/1e6, sig[1:]]))
+                        # correct the y-axis data ordering for plots
+                        sig = np.array([sig[i] for i in index_order])
+                        bg = np.array([bg[i] for i in index_order])
+                        
+                        # notify the streaminglist that this entry has updated so it will be pushed to the data server
+                        signal_sweeps.append(np.stack([tau_times_sorted[1:]/1e6, sig[1:]]))
                         signal_sweeps.updated_item(-1) 
-                        background_sweeps.append(np.stack([tau_times[1:]/1e6, bg[1:]]))
+                        background_sweeps.append(np.stack([tau_times_sorted[1:]/1e6, bg[1:]]))
                         background_sweeps.updated_item(-1)
 
-                        # save the current data to the data server.
+                        # save the current data to the data server
                         t1_data.push({'params': {'kwargs': kwargs},
                                         'title': 'MW T1 Relaxation',
                                         'xlabel': 'Free Precession Interval (ms)',
@@ -1240,21 +1067,19 @@ class SpinMeasurements:
                                                     'background': background_sweeps}
                         })
 
-                        if experiment_widget_process_queue(self.queue_to_exp) == 'stop':
-                            # the GUI has asked us nicely to exit
-                            if kwargs['save'] == True:
-                                flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
-                            return
-                        
+                        # update GUI progress bar                        
                         pbar.update(1)
                         percent_completed = str(int(((i+1)/kwargs['iters'])*100))
                         time_per_iter = (pbar.last_print_t - pbar.start_t)/pbar.n
                         self.queue_from_exp.put_nowait([percent_completed, time_per_iter])
 
+                # save data if requested upon completion of experiment
                 if kwargs['save'] == True:
                     flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
 
-                self.equipment_off()
+            finally:
+                self.equipment_off() # turn off equipment regardless of if experiment started or failed
+
 
     def T2_scan(self, **kwargs):
         """
@@ -1272,10 +1097,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as t2_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             match kwargs['array_type']:
                 case 'geomspace':
@@ -1289,6 +1116,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             t2_buffer = self.generate_buffer('T2', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
             # configure devices used in scan
@@ -1379,6 +1209,8 @@ class SpinMeasurements:
             else:        
                 daq.open_ai_task(kwargs['detector'], len(t2_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
@@ -1397,9 +1229,14 @@ class SpinMeasurements:
                 with tqdm(total = kwargs['iters']) as pbar:
 
                     for i in range(kwargs['iters']):
+                        
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
 
-                        # read samples to buffer
-                        t2_result = read(t2_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        t2_result_raw = obtain(dig.acquire())
+                        
+                        t2_result = np.mean(t2_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(t2_result, 'T2', kwargs['num_pts'])[0]
@@ -1433,6 +1270,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -1461,10 +1301,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as dq_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             match kwargs['array_type']:
                 case 'geomspace':
@@ -1476,7 +1318,10 @@ class SpinMeasurements:
 
             # Generate DQ data buffer           
             dq_buffer = self.generate_buffer('DQ', kwargs['runs'], kwargs['num_pts'])
-            
+
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                
             if kwargs['pulse_axis'] == 'y':
                 delta = 90
             else:
@@ -1525,6 +1370,8 @@ class SpinMeasurements:
             else:
                 daq.open_ai_task(kwargs['detector'], len(dq_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 s00_sweeps = StreamingList()
@@ -1546,8 +1393,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
                         
-                        # read samples to buffer
-                        dq_result = read(dq_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        dq_result_raw = obtain(dig.acquire())
+                        
+                        dq_result = np.mean(dq_result_raw, axis=1)
 
                         # partition buffer into signal and background datasets
                         s00 = self.analog_math(dq_result, 'DQ', kwargs['num_pts'])[0] # data for S0,0 sequence
@@ -1591,6 +1443,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -1602,48 +1457,6 @@ class SpinMeasurements:
                     flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
 
                 self.equipment_off()
-
-    # def DEER_scan(self, **kwargs):
-    #     """
-    #     Run a DEER sweep over a set of MW frequencies.
-
-    #     Keyword args:
-    #         dataset: name of the dataset to push data to
-    #         start (float): start frequency
-    #         stop (float): stop frequency
-    #         num_pts (int): number of points between start-stop (inclusive)
-    #         iterations: number of times to repeat the experiment
-    #     """
-    #     # connect to the instrument server & the data server.
-    #     # create a data set, or connect to an existing one with the same name if it was created earlier.
-    #     with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as deer_data:
-    #         # load devices used in scan
-    #         laser = mgr.laser
-    #         sig_gen = mgr.sg
-    #         ps = mgr.ps
-    #         daq = mgr.daq
-    #         hdawg = mgr.awg
-
-    #         frequencies = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])            
-            
-    #         np.random.shuffle(frequencies)
-
-    #         # Generate Rabi data buffer
-    #         deer_buffer = self.generate_buffer('DEER', kwargs['runs'], kwargs['num_pts'])
-
-    #         sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
-
-    #         # configure devices used in scan
-    #         laser.set_modulation_state('pulsed')
-    #         laser.set_analog_control_mode('current')
-    #         laser.set_diode_current_realtime(kwargs['laser_power'])
-    #         laser.laser_on()
-    #         sig_gen.set_frequency(sig_gen_freq)
-    #         sig_gen.set_rf_amplitude(kwargs['rf_power'])
-    #         sig_gen.set_mod_type('QAM')
-    #         sig_gen.set_mod_function('external')
-    #         sig_gen.set_mod_toggle(1)
-    #         # sig_gen.set_rf_toggle(1)
 
     def DEER_scan(self, **kwargs):
         """
@@ -1661,10 +1474,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as deer_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             frequencies = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])            
             
@@ -1673,6 +1488,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             deer_buffer = self.generate_buffer('DEER', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
             # configure devices used in scan
@@ -1745,6 +1563,8 @@ class SpinMeasurements:
             else:
                 daq.open_ai_task(kwargs['detector'], len(deer_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 dark_signal_sweeps = StreamingList()
@@ -1766,8 +1586,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        deer_result = read(deer_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        deer_result_raw = obtain(dig.acquire())
+                        
+                        deer_result = np.mean(deer_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         dark_sig = self.analog_math(deer_result, 'DEER', kwargs['num_pts'])[0]
@@ -1813,6 +1638,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -1841,10 +1669,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as deer_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             dark_taus = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9            
 
@@ -1853,6 +1683,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             deer_buffer = self.generate_buffer('DEER', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
             # configure devices used in scan
@@ -1899,6 +1732,8 @@ class SpinMeasurements:
             else:
                 daq.open_ai_task(kwargs['detector'], len(deer_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 dark_signal_sweeps = StreamingList()
@@ -1920,8 +1755,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        deer_result = read(deer_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        deer_result_raw = obtain(dig.acquire())
+                        
+                        deer_result = np.mean(deer_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         dark_sig = self.analog_math(deer_result, 'DEER', kwargs['num_pts'])[0]
@@ -1967,6 +1807,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -1995,10 +1838,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as deer_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             match kwargs['array_type']:
                 case 'geomspace':
@@ -2011,6 +1856,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             deer_buffer = self.generate_buffer('DEER', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
             # configure devices used in scan
@@ -2058,6 +1906,8 @@ class SpinMeasurements:
                 print(e)
             else:
                 daq.open_ai_task(kwargs['detector'], len(deer_buffer[0]))
+                
+                dig.assign_param(dig_config)
 
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
@@ -2080,8 +1930,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        deer_result = read(deer_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        deer_result_raw = obtain(dig.acquire())
+                        
+                        deer_result = np.mean(deer_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         dark_sig = self.analog_math(deer_result, 'DEER', kwargs['num_pts'])[0]
@@ -2127,6 +1982,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -2155,10 +2013,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as cd_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             match kwargs['array_type']:
                 case 'geomspace':
@@ -2170,6 +2030,9 @@ class SpinMeasurements:
 
             # Generate Rabi data buffer
             deer_buffer = self.generate_buffer('CD', kwargs['runs'], kwargs['num_pts'])
+
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
 
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
@@ -2223,6 +2086,8 @@ class SpinMeasurements:
             else:
                 daq.open_ai_task(kwargs['detector'], len(deer_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 dark_signal_sweeps = StreamingList()
@@ -2246,8 +2111,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        cd_result = read(deer_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        cd_result_raw = obtain(dig.acquire())
+                        
+                        cd_result = np.mean(cd_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         dark_sig = self.analog_math(cd_result, 'CD', kwargs['num_pts'])[0]
@@ -2305,6 +2175,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -2333,10 +2206,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as corr_rabi_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             dark_taus = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])          
 
@@ -2345,6 +2220,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             corr_buffer = self.generate_buffer('Corr', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
             # configure devices used in scan
@@ -2392,6 +2270,8 @@ class SpinMeasurements:
             else:
                 daq.open_ai_task(kwargs['detector'], len(corr_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
@@ -2411,8 +2291,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        corr_result = read(corr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        corr_result_raw = obtain(dig.acquire())
+                        
+                        corr_result = np.mean(corr_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(corr_result, 'Corr', kwargs['num_pts'])[0]
@@ -2446,6 +2331,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -2474,10 +2362,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as corr_t1_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             match kwargs['array_type']:
                 case 'geomspace':
@@ -2490,6 +2380,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             corr_buffer = self.generate_buffer('DEER', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
             # configure devices used in scan
@@ -2537,6 +2430,8 @@ class SpinMeasurements:
             else:
                 daq.open_ai_task(kwargs['detector'], len(corr_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 with_pulse_py_sweeps = StreamingList()
@@ -2558,8 +2453,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        corr_result = read(corr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        corr_result_raw = obtain(dig.acquire())
+                        
+                        corr_result = np.mean(corr_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         with_py = self.analog_math(corr_result, 'DEER', kwargs['num_pts'])[0]
@@ -2605,6 +2505,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -2633,10 +2536,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as nmr_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             t_corr_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
 
@@ -2645,6 +2550,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             nmr_buffer = self.generate_buffer('NMR', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for x pulse by default
 
             # configure devices used in scan
@@ -2690,6 +2598,8 @@ class SpinMeasurements:
             else:  
                 daq.open_ai_task(kwargs['detector'], len(nmr_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
@@ -2709,9 +2619,14 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        nmr_result = read(nmr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
-                            
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        nmr_result_raw = obtain(dig.acquire())
+                        
+                        nmr_result = np.mean(nmr_result_raw, axis=1)
+
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(nmr_result, 'NMR', kwargs['num_pts'])[0]
                         bg = self.analog_math(nmr_result, 'NMR', kwargs['num_pts'])[1]
@@ -2744,6 +2659,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)
@@ -2772,10 +2690,12 @@ class SpinMeasurements:
         with InstrumentManager() as mgr, DataSource(kwargs['dataset']) as casr_data:
             # load devices used in scan
             laser = mgr.laser
+            laser_shutter = mgr.laser_shutter
             sig_gen = mgr.sg
             ps = mgr.ps
             daq = mgr.daq
             hdawg = mgr.awg
+            dig = mgr.dig
 
             t_corr_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
 
@@ -2784,6 +2704,9 @@ class SpinMeasurements:
             # Generate Rabi data buffer
             casr_buffer = self.generate_buffer('NMR', kwargs['runs'], kwargs['num_pts'])
 
+            dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+            
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for x pulse by default
 
             # configure devices used in scan
@@ -2829,6 +2752,8 @@ class SpinMeasurements:
             else:  
                 daq.open_ai_task(kwargs['detector'], len(casr_buffer[0]))
 
+                dig.assign_param(dig_config)
+
                 # for storing the experiment data
                 # list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
@@ -2848,8 +2773,13 @@ class SpinMeasurements:
 
                     for i in range(kwargs['iters']):
 
-                        # read samples to buffer
-                        nmr_result = read(casr_buffer[0], ps_seq, kwargs['runs'], kwargs['timeout']) 
+                        dig.config()
+                        dig.start_buffer()
+                        ps.stream(ps_seq, kwargs['runs']) # execute chosen sequence on Pulse Streamer
+
+                        nmr_result_raw = obtain(dig.acquire())
+                        
+                        nmr_result = np.mean(nmr_result_raw, axis=1)
                             
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(nmr_result, 'NMR', kwargs['num_pts'])[0]
@@ -2883,6 +2813,9 @@ class SpinMeasurements:
                             # the GUI has asked us nicely to exit
                             if kwargs['save'] == True:
                                 flexSave(kwargs['dataset'], kwargs['dataset'], kwargs['filename'], [kwargs['directory']])
+                            
+                            self.equipment_off()
+
                             return
                         
                         pbar.update(1)

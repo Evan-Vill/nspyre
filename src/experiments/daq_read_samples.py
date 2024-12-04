@@ -14,20 +14,20 @@ def read(buffer, seq, runs, timeout):
         '''
         with InstrumentManager() as mgr:
             try:
-                mgr.NI_DAQ.start_ai_task()
+                mgr.daq.start_ai_task()
             except:
                 print("DAQ TASK ERROR!")
             
             runs = int(np.ceil(runs)) # integer no. of runs
             
-            mgr.SWABIAN_Pulse_Streamer.stream(seq, runs) # execute chosen sequence on Pulse Streamer
+            mgr.ps.stream(seq, runs) # execute chosen sequence on Pulse Streamer
             
             timeout = int(timeout)
 
-            buffer = obtain(mgr.NI_DAQ.read_samples(buffer, len(buffer), timeout)) # convert data back to numpy array from rpyc.netref data type 
+            buffer = obtain(mgr.daq.read_samples(buffer, len(buffer), timeout)) # convert data back to numpy array from rpyc.netref data type 
 
-            mgr.NI_DAQ.stop_ai_task()
-            mgr.SWABIAN_Pulse_Streamer.Pulser.reset()
+            mgr.daq.stop_ai_task()
+            mgr.ps.Pulser.reset()
 
             return buffer     
 
@@ -37,17 +37,17 @@ def read_9775(buffer, seq, runs, timeout):
         '''
         with MyInstrumentManager() as mgr:
             try:
-                mgr.NI_DAQ.start_task()
+                mgr.daq.start_task()
             except:
                 print("DAQ TASK ERROR!")
             
             runs = int(np.ceil(runs)) # integer no. of runs
             
-            mgr.SWABIAN_Pulse_Streamer.stream(seq, runs) # execute chosen sequence on Pulse Streamer
+            mgr.ps.stream(seq, runs) # execute chosen sequence on Pulse Streamer
 
-            buffer = obtain(mgr.NI_DAQ.read_samples(buffer, len(buffer), timeout)) # convert data back to numpy array from rpyc.netref data type 
+            buffer = obtain(mgr.daq.read_samples(buffer, len(buffer), timeout)) # convert data back to numpy array from rpyc.netref data type 
 
-            mgr.NI_DAQ.stop_task()
-            mgr.SWABIAN_Pulse_Streamer.Pulser.reset()
+            mgr.daq.stop_task()
+            mgr.ps.Pulser.reset()
 
             return buffer     

@@ -37,23 +37,23 @@ with InstrumentServer() as local_inserv:
                      args = ['68800950'])
 
     local_inserv.add(name = 'sg', 
-                     class_path = _HERE / 'sg396_driver_v1.py', 
+                     class_path = _HERE / 'sg396_driver.py', 
                      class_name = 'SG396',
                      args = ['TCPIP::10.135.70.65::inst0::INSTR'])
 
     local_inserv.add(name = 'awg', 
-                     class_path = _HERE / 'hdawg_driver_latest_v2.py', 
+                     class_path = _HERE / 'hdawg_driver_latest.py', 
                      class_name = 'HDAWG',
                      args = ['dev8181', '127.0.0.1', 8004])
     
     local_inserv.add(name = 'ps',
-                     class_path = _HERE / 'ps_driver_latest_v2.py',
+                     class_path = _HERE / 'ps_driver_new_sideband.py',
                      class_name = 'Pulses')
     
-    local_inserv.add(name = 'dig', 
-                     class_path = _HERE  / 'FIFOv4.py', 
-                     class_name = 'FIFO', 
-                     args = ['/dev/spcm0'])
+    # local_inserv.add(name = 'dig', 
+    #                  class_path = _HERE  / 'FIFOv4.py', 
+    #                  class_name = 'FIFO', 
+    #                  args = ['/dev/spcm0'])
 
     local_inserv.add(name = 'daq',
                      class_path = _HERE / 'daq_driver_new.py',
