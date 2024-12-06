@@ -37,7 +37,7 @@ class FIFO():
                                 AMP = 1000 , # in mV
                                 card_timeout = 20*units.s,
                                 DCCOUPLE = 1,
-                                HF_INPUT_50OHM = 1,
+                                HF_INPUT_50OHM = 1, # 1 = 50 ohm, 0 = 1 Mohm
                                 num_pts_in_exp = None,
                                 num_iters = None,
                                 mem_size = None, 
@@ -141,7 +141,8 @@ class FIFO():
         self.card.timeout(self.card_timeout)
 
         # set Analog input parameters
-        self.card.set_i(self.PATH, self.HF_INPUT_50OHM)
+        print(f"50 ohm impedance? {int(self.HF_INPUT_50OHM/units.Sa)}")
+        self.card.set_i(self.PATH, int(self.HF_INPUT_50OHM/units.Sa))
         self.card.set_i(self.AMP_ch, int(self.AMP))
         # self.card.set_i(spcm.SPC_OFFS0, int(50)) # offset by how much percent
         self.card.set_i(self.ACDC, self.ACCOUPLE)
@@ -193,6 +194,7 @@ class FIFO():
             # print(data_block)
             print(np.shape(data_block))
             
+            print(f"termination setting: {self.HF_INPUT_50OHM/units.Sa}")
             # self.card.set_i(spcm.SPC_M2CMD, spcm.M2CMD_DATA_WAITDMA)
             self.raw_data = np.copy(data_block)
             self.max_value = self.card.max_sample_value()

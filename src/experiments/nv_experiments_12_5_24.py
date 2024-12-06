@@ -406,7 +406,7 @@ class SpinMeasurements:
             odmr_buffer = self.generate_buffer('ODMR', kwargs['runs'])
 
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 0)
 
 
             # frequencies that will be swept over in the ODMR measurement
@@ -563,7 +563,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 0)
             
 
             # configure signal generator for NV drive
@@ -712,8 +712,7 @@ class SpinMeasurements:
 
             # configure digitizer (need to set impedance = 1 Mohm)
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], 
-                                                  termination = 0)
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 0)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -888,7 +887,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 0)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -1038,7 +1037,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -1205,7 +1204,7 @@ class SpinMeasurements:
 
     #         # configure digitizer
     #         dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-    #                                               pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+    #                                               pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
     #         # configure signal generator for NV drive
     #         sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -1372,7 +1371,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -1524,7 +1523,7 @@ class SpinMeasurements:
             t1_buffer = self.generate_buffer('Opt T1', kwargs['runs'], kwargs['num_pts'])
             
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             ps_seq = ps.Optical_T1(tau_times)
 
@@ -1643,7 +1642,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -1855,7 +1854,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -2030,7 +2029,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -2218,7 +2217,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -2419,7 +2418,7 @@ class SpinMeasurements:
 
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -2607,7 +2606,7 @@ class SpinMeasurements:
             
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -2797,7 +2796,7 @@ class SpinMeasurements:
             
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -2998,7 +2997,7 @@ class SpinMeasurements:
             
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -3173,7 +3172,7 @@ class SpinMeasurements:
             
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -3357,7 +3356,7 @@ class SpinMeasurements:
             
             # configure digitizer
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], iters = kwargs['iters'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             # configure signal generator for NV drive
             sig_gen.set_frequency(sig_gen_freq) # set carrier frequency
@@ -3512,7 +3511,7 @@ class SpinMeasurements:
             casr_buffer = self.generate_buffer('NMR', kwargs['runs'], kwargs['num_pts'])
 
             dig_config = self.digitizer_configure(num_pts_in_exp = kwargs['num_pts'], segment_size = kwargs['segment_size'], 
-                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'])
+                                                  pretrig_size = kwargs['pretrig_size'], read_channel = kwargs['read_channel'], runs = kwargs['runs'], termination = 1)
             
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for x pulse by default
 

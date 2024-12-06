@@ -36,7 +36,7 @@ from nspyre import InstrumentManager
 
 from gui_test import Communicate 
 
-import nv_experiments_11_22_24_v2
+import nv_experiments_12_5_24
 
 class ExpWidget(QWidget):
     
@@ -85,6 +85,7 @@ class ExpWidget(QWidget):
 
         self.odmr_params_defaults = [12, 10, 2.87e9, 100e6, 30, 1e-9, 300, 'odmr']
         self.rabi_params_defaults = [12, 10, 0, 500e-9, 100, 2.87e9, 1e-9, self.rabi_axis_opts, self.rabi_device_opts, 300, 'rabi']    
+        self.pulsed_odmr_params_defaults = [12, 10, 2.87e9, 100e6, 30, 1e-9, 100e-9, 300, 'odmr']
         self.opt_t1_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.opt_t1_array_opts, 300, 't1']
         self.mw_t1_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.mw_t1_array_opts, 2.87e9, 1e-9, 20e-9, 'y', 300, 't1']
         self.t2_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.t2_array_opts, 2.87e9, 1e-9, 20e-9, 'y', self.t2_seq_opts, 1, 300, 't2']
@@ -108,7 +109,7 @@ class ExpWidget(QWidget):
                     "Laser": [None, self.laser_params_defaults],
                     "CW Laser": [None, self.laser_cw_params_defaults],
                     "Digitizer": [None, self.digitizer_defaults],
-                    "Pulsed ODMR": ["pulsed_odmr_scan", self.odmr_params_defaults],
+                    "Pulsed ODMR": ["pulsed_odmr_scan", self.pulsed_odmr_params_defaults],
                     "Rabi": ["rabi_scan", self.rabi_params_defaults],
                     "Optical T1": ["OPT_T1_scan", self.opt_t1_params_defaults],
                     "MW T1": ["MW_T1_scan", self.mw_t1_params_defaults],
@@ -393,7 +394,7 @@ class ExpWidget(QWidget):
             case 'Digitizer':
                 params = {
                         'segment_size': {'display_text': 'Segment Size: ',
-                                'widget': SpinBox(value = defaults[0], int = True, bounds=(0, 1024), dec = True)},
+                                'widget': SpinBox(value = defaults[0], int = True, bounds=(0, 1e9), dec = True)},
                         'dig_timeout': {'display_text': 'Card Timeout: ',
                                 'widget': SpinBox(value = defaults[1], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'sampling_freq': {'display_text': 'Sampling Frequency: ',
@@ -405,27 +406,26 @@ class ExpWidget(QWidget):
                         'pretrig_size': {'display_text': '# Pretrigger Samples: ',
                                 'widget': SpinBox(value = defaults[5], int = True, bounds=(0, 1024), dec = True)}}
 
-                    
             case 'Pulsed ODMR':    
                 params = {
                         'runs': {'display_text': 'Runs (per pt.): ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
-                        'start': {'display_text': 'Start Frequency: ',
+                        'freq': {'display_text': 'Center Frequency: ',
                                 'widget': SpinBox(value = defaults[2], suffix = 'Hz', siPrefix = True, bounds = (100e3, 6e9), dec = True)},
-                        'stop': {'display_text': 'End Frequency: ',
-                                'widget': SpinBox(value = defaults[3], suffix = 'Hz', siPrefix = True, bounds = (100e3, 6e9), dec = True)},
+                        'max_sideband_freq': {'display_text': 'Half Frequency Span: ',
+                                'widget': SpinBox(value = defaults[3], suffix = 'Hz', siPrefix = True, bounds = (100e3, 100e6), dec = True)},
                         'num_pts': {'display_text': '# Frequencies: ',
                                 'widget': SpinBox(value = defaults[4], int = True, bounds=(1, None), dec = True)},
                         'rf_power': {'display_text': 'NV MW Power: ',
                                 'widget': SpinBox(value = defaults[5], suffix = 'W', siPrefix = True)},
-                        # 'odmr_type': {'display_text': 'ODMR Type: ',
-                        #         'widget': ComboBox(items = ["CW", "Pulsed"])},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
+                        'pi': {'display_text': '\u03C0 Pulse: ',
                                 'widget': SpinBox(value = defaults[6], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
+                        'timeout': {'display_text': 'Exp. Timeout: ',
+                                'widget': SpinBox(value = defaults[7], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[7])}}
+                                'widget': QtWidgets.QLineEdit(defaults[8])}}
             case 'Rabi':    
                 params = {
                         'runs': {'display_text': 'Runs (per pt.): ',
@@ -1058,7 +1058,7 @@ class ExpWidget(QWidget):
             return
 
         # reload the module at runtime in case any changes were made to the code
-        reload(nv_experiments_11_22_24_v2)
+        reload(nv_experiments_12_5_24)
         
         self.status.setStyleSheet("color: black; background-color: gold; border: 4px solid black;")
         self.status.setText(f"{self.experiments.currentText()} scan in progress...")
@@ -1084,7 +1084,7 @@ class ExpWidget(QWidget):
         # call the function in a new process
         self.run_proc.run(
             run_experiment,
-            exp_cls = nv_experiments_11_22_24_v2.SpinMeasurements,
+            exp_cls = nv_experiments_12_5_24.SpinMeasurements,
             fun_name = self.exp_dict[self.experiments.currentText()][0],
             constructor_args = list(),
             constructor_kwargs = dict(),

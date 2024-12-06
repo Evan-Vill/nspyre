@@ -125,6 +125,56 @@ class Pulses():
 
             iq_off = self.probe_time - self.awg_trig_time
 
+            laser_seq = [(self.probe_time, 1)]
+            # laser_seq = [(1000, 0), (1000, 1), (self.probe_time - 4000, 0), (1000, 1), (1000, 0)]
+
+            # define sequence structure for clock and MW I/Q channels
+            dig_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off2, 0)]
+            # dig_clock_seq = [(self.probe_time, 0), (self.clock_time, 1), (clock_off2, 0), (clock_off1, 0)]
+
+            mw_iq_seq_on = [(self.awg_trig_time, 1), (iq_off, 0)]
+            mw_iq_seq_off = [(self.probe_time, 0)]
+
+            # assign sequences to respective channels
+            seq_on.setDigital(3, laser_seq) # laser 
+            seq_on.setDigital(1, dig_clock_seq) # digitizer trigger
+            seq_on.setDigital(2, mw_iq_seq_on) # MW IQ
+
+            seq_off.setDigital(3, laser_seq) # laser 
+            seq_off.setDigital(1, dig_clock_seq) # digitizer trigger
+            seq_off.setDigital(2, mw_iq_seq_off) # MW IQ
+
+            return seq_on + seq_off
+
+        seqs = self.Pulser.createSequence()
+
+        for i in range(num_freqs):
+            seqs += SingleCW_ODMR()
+
+        return seqs
+    
+    def CW_orig_ODMR(self, num_freqs):
+        
+        '''
+        CW ODMR Sequence
+        Laser on for entire sequence. 
+        MW on for probe_time.
+        MW off for probe_time.
+        User sets how many voltage samples (num_clocks) to take during each MW on/off window.
+        '''
+    
+        def SingleCW_ODMR():
+            
+            # create sequence object
+            seq_on = self.Pulser.createSequence()
+            seq_off = self.Pulser.createSequence()
+
+            # digitizer trigger timing
+            clock_off1 = self.probe_time - 2*self.readout_time - self.clock_time
+            clock_off2 = 2*self.readout_time
+
+            iq_off = self.probe_time - self.awg_trig_time
+
             # define sequence structure for clock and MW I/Q channels
             dig_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off2, 0)]
             
@@ -188,21 +238,100 @@ class Pulses():
     
         return seqs
     
-    def Pulsed_ODMR(self, params, pi_xy, pi_time):
+    # def Pulsed_ODMR(self, num_freqs, pi_time):
+    #     '''
+    #     Pulsed ODMR sequence
+    #     '''
+    #     ## Run a MW pulse at pi time, then measure the signal
+    #     ## and reference counts from NV.
+
+    #     pi_time = self.convert_type(round(pi_time), float)
+    #     ## we can measure the pi time on x and on y.
+    #     ## they should be the same, but they technically
+    #     ## have different offsets on our pulse streamer.
+
+    #     def SinglePulsed_ODMR():
+    #         '''
+    #         CREATE SINGLE RABI SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+    #         '''
+
+    #         '''
+    #         DEFINE SPECIAL TIME INTERVALS FOR EXPERIMENT
+    #         '''
+    #         # padding time to equalize duration of every run (for different vsg_on durations)
+    #         # pad_time = 50000 - self.initial_delay - self.laser_time - self.singlet_decay - iq_on - self.MW_buffer_time - self.readout_time 
+
+    #         '''
+    #         DEFINE RELEVANT ON, OFF TIMES FOR DEVICES
+    #         '''
+
+    #         laser_off1 = self.initial_delay 
+    #         laser_off2 = self.singlet_decay + pi_time + self.MW_buffer_time
+    #         laser_off3 = 1000
+
+    #         # mw I & Q off windows
+    #         iq_off1 = laser_off1
+    #         iq_off2 = (self.laser_time - self.awg_trig_time) + laser_off2 + self.readout_time + laser_off3
+
+    #         # Digitizer trigger timing
+    #         # clock_off1 = laser_off1 + self.laser_time + laser_off2 + self.trig_spot - self.clock_time
+    #         # clock_off2 = - self.trig_spot + self.readout_time + laser_off3
+
+    #         clock_off1 = laser_off1 + self.laser_time + self.trig_spot
+    #         clock_off2 = laser_off2 - self.clock_time - self.trig_spot + self.readout_time + laser_off3
+
+    #         '''
+    #         CONSTRUCT PULSE SEQUENCE
+    #         '''
+    #         # create sequence objects for MW on and off blocks
+    #         seq_on = self.Pulser.createSequence()
+    #         seq_off = self.Pulser.createSequence()
+
+    #         # define sequence structure for laser            
+    #         laser_seq = [(laser_off1, 0), (self.laser_time, 1), (laser_off2, 1), (self.readout_time, 1), (laser_off3, 0)]
+    #                     #  (laser_off3, 0), (self.laser_time, 1), (laser_off4, 0), (self.readout_time, 1), (laser_off5, 0)]
+        
+    #         # define sequence structure for DAQ trigger
+    #         dig_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off2, 0)]
+
+    #         # define sequence structure for MW I and Q when MW = ON
+    #         mw_iq_on_seq = [(iq_off1, 0), (self.awg_trig_time, 1), (iq_off2, 0)]
+    #         mw_iq_off_seq = [(iq_off1, 0), (self.awg_trig_time, 0), (iq_off2, 0)]
+
+    #         # assign sequences to respective channels for seq_on
+    #         seq_on.setDigital(3, laser_seq) # laser 
+    #         seq_on.setDigital(1, dig_clock_seq) # digitizer trigger
+    #         seq_on.setDigital(2, mw_iq_on_seq) # RF control switch
+
+    #         # assign sequences to respective channels for seq_off
+    #         seq_off.setDigital(3, laser_seq) # laser
+    #         seq_off.setDigital(1, dig_clock_seq) # digitizer trigger
+    #         seq_off.setDigital(2, mw_iq_off_seq) # RF control switch
+
+    #         return seq_on + seq_off
+
+    #     seqs = self.Pulser.createSequence()
+
+    #     for i in range(num_freqs):
+    #         seqs += SinglePulsed_ODMR()
+
+    #     return seqs
+
+    def Pulsed_ODMR(self, num_freqs, pi_time):
         '''
         Pulsed ODMR sequence
         '''
-        ## Run a MW pulse of varying frequency, then measure the signal
+        ## Run a MW pulse at pi time, then measure the signal
         ## and reference counts from NV.
-        
-        if pi_xy == 'x':
-            self.IQ_ON = self.IQpx
-        else:
-            self.IQ_ON = self.IQpy
 
-        def SinglePulsedODMR():
+        pi_time = self.convert_type(round(pi_time), float)
+        ## we can measure the pi time on x and on y.
+        ## they should be the same, but they technically
+        ## have different offsets on our pulse streamer.
+
+        def SinglePulsed_ODMR():
             '''
-            CREATE SINGLE PULSED ODMR SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
+            CREATE SINGLE RABI SEQUENCE TO REPEAT THROUGHOUT EXPERIMENT
             '''
 
             '''
@@ -217,15 +346,15 @@ class Pulses():
 
             laser_off1 = self.initial_delay 
             laser_off2 = self.singlet_decay + pi_time + self.MW_buffer_time
-            laser_off3 = 200 # constant wait 200 ns between sweeps
+            laser_off3 = 1000
 
             # mw I & Q off windows
             iq_off1 = laser_off1 + self.laser_time + self.singlet_decay
-            iq_off2 = self.MW_buffer_time + 1*self.readout_time + laser_off3 # + self.laser_time # + laser_off4 + laser_off5
+            iq_off2 = (pi_time - self.awg_trig_time) + self.MW_buffer_time + self.readout_time + laser_off3 # + self.laser_time # + laser_off4 + laser_off5
 
-            # DAQ trigger windows
-            clock_off1 = laser_off1 + self.laser_time + laser_off2 + self.readout_time - self.trig_spot - self.clock_time
-            clock_off2 = self.trig_spot + laser_off3
+            # Digitizer trigger timing
+            clock_off1 = laser_off1 + self.laser_time + laser_off2 + self.trig_spot - self.clock_time
+            clock_off2 = - self.trig_spot + self.readout_time + laser_off3
                    
             '''
             CONSTRUCT PULSE SEQUENCE
@@ -239,39 +368,28 @@ class Pulses():
                         #  (laser_off3, 0), (self.laser_time, 1), (laser_off4, 0), (self.readout_time, 1), (laser_off5, 0)]
         
             # define sequence structure for DAQ trigger
-            daq_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off2, 0)]
+            dig_clock_seq = [(clock_off1, 0), (self.clock_time, 1), (clock_off2, 0)]
 
             # define sequence structure for MW I and Q when MW = ON
-            mw_I_on_seq = [(iq_off1, self.IQ0[0]), (pi_time, self.IQ_ON[0]), (iq_off2, self.IQ0[0])]
-            mw_Q_on_seq = [(iq_off1, self.IQ0[1]), (pi_time, self.IQ_ON[1]), (iq_off2, self.IQ0[1])]
-            
-            # when MW = OFF
-            mw_I_off_seq = [(iq_off1, self.IQ0[0]), (pi_time, self.IQ0[0]), (iq_off2, self.IQ0[0])]
-            mw_Q_off_seq = [(iq_off1, self.IQ0[1]), (pi_time, self.IQ0[1]), (iq_off2, self.IQ0[1])]
-
-            # switch_on_seq = [(iq_off1 - 20, 0), (iq_on + 40, 1), (iq_off2 - 20, 0)]
-            # switch_off_seq = [(iq_off1 - 20, 0), (iq_on + 40, 0), (iq_off2 - 20, 0)]
+            mw_iq_on_seq = [(iq_off1, 0), (self.awg_trig_time, 1), (iq_off2, 0)]
+            mw_iq_off_seq = [(iq_off1, 0), (self.awg_trig_time, 0), (iq_off2, 0)]
 
             # assign sequences to respective channels for seq_on
             seq_on.setDigital(3, laser_seq) # laser 
-            seq_on.setDigital(0, daq_clock_seq) # integrator trigger
-            # seq_on.setDigital(1, switch_on_seq) # RF control switch
-            seq_on.setAnalog(0, mw_I_on_seq) # mw_I
-            seq_on.setAnalog(1, mw_Q_on_seq) # mw_Q
-            
+            seq_on.setDigital(1, dig_clock_seq) # digitizer trigger
+            seq_on.setDigital(2, mw_iq_on_seq) # RF control switch
+
             # assign sequences to respective channels for seq_off
             seq_off.setDigital(3, laser_seq) # laser
-            seq_off.setDigital(0, daq_clock_seq) # integrator trigger
-            # seq_off.setDigital(1, switch_off_seq) # RF control switch
-            seq_off.setAnalog(0, mw_I_off_seq) # mw_I
-            seq_off.setAnalog(1, mw_Q_off_seq) # mw_Q
+            seq_off.setDigital(1, dig_clock_seq) # digitizer trigger
+            seq_off.setDigital(2, mw_iq_off_seq) # RF control switch
 
             return seq_on + seq_off
 
         seqs = self.Pulser.createSequence()
 
-        for i in range(params):
-            seqs += SinglePulsedODMR()
+        for i in range(num_freqs):
+            seqs += SinglePulsed_ODMR()
 
         return seqs
     
