@@ -92,17 +92,27 @@ class Pulses():
     '''
     PULSE SEQUENCES FOR NanoNMR EXPERIMENTS
     '''   
+    # def SigvsTime(self, sampling_interval):
+    #     seq = self.Pulser.createSequence()
+        
+    #     trig_off = sampling_interval - self.clock_time
+    #     daq_clock_seq = [(trig_off, 0), (self.clock_time, 1)]
+    #     print(daq_clock_seq)
+
+    #     seq.setDigital(0, daq_clock_seq) # integrator trigger
+
+    #     return seq
+
     def SigvsTime(self, sampling_interval):
         seq = self.Pulser.createSequence()
         
         trig_off = sampling_interval - self.clock_time
-        daq_clock_seq = [(trig_off, 0), (self.clock_time, 1)]
-        print(daq_clock_seq)
+        dig_clock_seq = [(trig_off, 0), (self.clock_time, 1)]
 
-        seq.setDigital(0, daq_clock_seq) # integrator trigger
+        seq.setDigital(1, dig_clock_seq) # integrator trigger
 
         return seq
-    
+
     def CW_ODMR(self, num_freqs):
         
         '''

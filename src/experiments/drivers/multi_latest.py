@@ -37,10 +37,11 @@ class Multi():
                                 AMP = 500 , # in mV
                                 card_timeout = 20 * units.s,
                                 DCCOUPLE = 1,
-                                HF_INPUT_50OHM = 1,
+                                HF_INPUT_50OHM = 0,
                                 num_pts_in_exp = None ,
                                 mem_size = None, 
                                 num_segment = None,
+                                num_iters =1,
                                 pretrig_size = 32 * units.Sa, 
                                 posttrig_size = None,
                                 readout_ch = None,
@@ -103,7 +104,7 @@ class Multi():
 
         self.posttrig_size = (self.segment_size - self.pretrig_size)
         
-        self.num_segment = self.runs*self.num_pts_in_exp
+        self.num_segment = self.runs*self.num_pts_in_exp*self.num_iters
         self.mem_size = self.num_segment * self.segment_size
         # print(obtain(self.mem_size), type(obtain(self.mem_size)))
         # setup clock engine

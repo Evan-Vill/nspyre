@@ -94,15 +94,16 @@ class FIFO():
                     setattr(self, key, value*units.Sa)
                 else:
                     setattr(self, key, value)
-            ### TODO: PRINT THE PASSED CONFIG VALUE TO FIX THE UNIT PROBLEM 
    
     def config(self):
         
         # handling memory assignment 
 
-        # print("SETTINGS: card timeout = ", self.card_timeout)
-        # print("SETTINGS: # segments = ", self.segment_size)
-        # print("SETTINGS: sampling freq = ", self.sampling_frequency)
+        print("SETTINGS: card timeout = ", self.card_timeout)
+        print("SETTINGS: # segments = ", self.segment_size)
+        print("SETTINGS: sampling freq = ", self.sampling_frequency)
+        print("SETTINGS: pretrig size = ", self.pretrig_size)
+        print("SETTINGS: termination = ", int(self.HF_INPUT_50OHM/units.Sa))
 
         self.posttrig_size = (self.segment_size - self.pretrig_size)
         
@@ -145,7 +146,7 @@ class FIFO():
         self.card.set_i(self.PATH, int(self.HF_INPUT_50OHM/units.Sa))
         self.card.set_i(self.AMP_ch, int(self.AMP))
         # self.card.set_i(spcm.SPC_OFFS0, int(50)) # offset by how much percent
-        self.card.set_i(self.ACDC, self.ACCOUPLE)
+        self.card.set_i(self.ACDC, int(self.ACCOUPLE/units.Sa))
 
         # setup trigger engine
         trigger = spcm.Trigger(self.card)

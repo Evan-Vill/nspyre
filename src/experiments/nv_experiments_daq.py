@@ -289,7 +289,7 @@ class SpinMeasurements:
             daq.close_do_task()
             daq.close_ao_task()
             daq.close_ai_task()
-            # hdawg.set_disabled()
+            hdawg.set_disabled()
 
     def choose_sideband(self, opt, nv_freq, side_freq, pulse_axis='x'):
         match pulse_axis:
@@ -361,7 +361,7 @@ class SpinMeasurements:
             # t = []
 
             for i in range(10000):
-                print("Scan index ", i)
+                # print("Scan index ", i)
                 sig_result = read(signal_array, ps_seq, n_runs, 1)
 
                 sig_result = np.mean(sig_result)
@@ -480,7 +480,7 @@ class SpinMeasurements:
             max_sideband_freq = kwargs['max_sideband_freq'] # set span of ODMR sweep as max sideband modulation frequency --> 100 MHz max. for SG396 IQ bandwidth
 
             # define parameter array that will be swept over in experiment & shuffle
-            mod_freqs = np.linspace(max_sideband_freq, max_sideband_freq, kwargs['num_pts'])            
+            mod_freqs = np.linspace(0, max_sideband_freq, kwargs['num_pts'])            
             
             np.random.shuffle(mod_freqs)
             

@@ -34,7 +34,7 @@ from nspyre import ParamsWidget
 from nspyre import experiment_widget_process_queue
 from nspyre import InstrumentManager
 
-import nv_experiments_sideband
+import nv_experiments_daq
 
 class Communicate(QObject):
     # Create a custom signal

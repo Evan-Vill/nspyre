@@ -36,7 +36,8 @@ from nspyre import InstrumentManager
 
 from gui_test import Communicate 
 
-import nv_experiments_12_5_24
+import nv_experiments_12_13_24
+import nv_experiments_daq
 
 class ExpWidget(QWidget):
     
@@ -56,14 +57,13 @@ class ExpWidget(QWidget):
         self.sideband_opts = ["Lower", "Upper"]
         self.sideband_cw_opts = ["Lower", "Upper"]
         self.detector_opts = ["APD", "PMT"]
-        self.detector_cw_opts = ["APD", "PMT"]
 
         self.dig_ro_chan_opts = ["0", "1"]
 
         self.sigvstime_detector_opts = ["APD", "PMT"]
 
         self.rabi_axis_opts = ["y", "x"]
-        self.rabi_device_opts = ["SRS", "AWG"]
+        # self.rabi_device_opts = ["SRS", "AWG"]
        
         self.opt_t1_array_opts = ["geomspace", "linspace"]
         self.mw_t1_array_opts = ["geomspace", "linspace"]
@@ -77,37 +77,35 @@ class ExpWidget(QWidget):
         self.corr_t1_array_opts = ["geomspace", "linspace"]
         # self.nmr_seq_opts = ["Correlation Spectroscopy", "CASR", "AERIS", "PROPI"]
         
-        self.sigvstime_params_defaults = [100, self.sigvstime_detector_opts, 'sigvstime']
+        self.sigvstime_params_defaults = [1e3, self.sigvstime_detector_opts]
 
         self.laser_params_defaults = [30, 30e6, 0.45, self.sideband_opts, -0.002, -0.004, self.detector_opts]
-        self.laser_cw_params_defaults = [30, 5e-5, 30e6, 0.15, self.sideband_cw_opts, -0.002, -0.004, self.detector_cw_opts]
         self.digitizer_defaults = [512, 5, 500e6, 0.5, self.dig_ro_chan_opts, 32]
 
-        self.odmr_params_defaults = [12, 10, 2.87e9, 100e6, 30, 1e-9, 300, 'odmr']
-        self.rabi_params_defaults = [12, 10, 0, 500e-9, 100, 2.87e9, 1e-9, self.rabi_axis_opts, self.rabi_device_opts, 300, 'rabi']    
-        self.pulsed_odmr_params_defaults = [12, 10, 2.87e9, 100e6, 30, 1e-9, 100e-9, 300, 'odmr']
-        self.opt_t1_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.opt_t1_array_opts, 300, 't1']
-        self.mw_t1_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.mw_t1_array_opts, 2.87e9, 1e-9, 20e-9, 'y', 300, 't1']
-        self.t2_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.t2_array_opts, 2.87e9, 1e-9, 20e-9, 'y', self.t2_seq_opts, 1, 300, 't2']
+        self.odmr_params_defaults = [12, 10, 2.87e9, 100e6, 30, 1e-9, 10e-6]
+        self.rabi_params_defaults = [12, 10, 0, 500e-9, 100, 2.87e9, 1e-9, self.rabi_axis_opts]#, self.rabi_device_opts]    
+        self.pulsed_odmr_params_defaults = [12, 10, 2.87e9, 100e6, 30, 1e-9, 100e-9]
+        self.opt_t1_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.opt_t1_array_opts]
+        self.mw_t1_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.mw_t1_array_opts, 2.87e9, 1e-9, 20e-9, 'y']
+        self.t2_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.t2_array_opts, 2.87e9, 1e-9, 20e-9, 'y', self.t2_seq_opts, 1]
 
-        self.dq_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.dq_array_opts, 2.87e9, 1e-9, 20e-9, 2.87e9, 1e-9, 20e-9, 'y', 300, 'dq']
+        self.dq_params_defaults = [12, 10, 50e-9, 100e-6, 100, self.dq_array_opts, 2.87e9, 1e-9, 20e-9, 2.87e9, 1e-9, 20e-9, 'y']
 
-        self.deer_params_defaults = [12, 10, 350e6, 750e6, 201, 800e-9, 2.87e9, 1e-9, 20e-9, 'y', 0.2, 40e-9, self.deer_drive_opts, 300, 'deer']      
-        self.deer_rabi_params_defaults = [12, 10, 3e-9, 100e-9, 100, 800e-9, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 0.2, 300, 'deer rabi']     
-        self.deer_fid_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.fid_array_opts, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 0.2, 40e-9, 1, 300, 'fid']
+        self.deer_params_defaults = [12, 10, 350e6, 750e6, 201, 800e-9, 2.87e9, 1e-9, 20e-9, 'y', 0.2, 40e-9, self.deer_drive_opts]      
+        self.deer_rabi_params_defaults = [12, 10, 3e-9, 100e-9, 100, 800e-9, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 0.2]     
+        self.deer_fid_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.fid_array_opts, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 0.2, 40e-9, 1]
         
-        self.deer_fid_cd_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.fid_cd_array_opts, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 0.2, 40e-9, 0.1, 1, 300, 'fid cd']      
+        self.deer_fid_cd_params_defaults = [12, 10, 50e-9, 20e-6, 100, self.fid_cd_array_opts, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 0.2, 40e-9, 0.1, 1]      
         
-        self.deer_corr_rabi_params_defaults = [12, 10, 3e-9, 100e-9, 100, 800e-9, 1e-6, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 40e-9, 0.2, 300, 'corr rabi']
-        self.deer_corr_t1_params_defaults = [12, 10, 50e-9, 1e-6, 100, self.corr_t1_array_opts, 800e-9, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 40e-9, 0.2, 300, 'corr t1']
-        self.nmr_params_defaults = [12, 10, 50e-9, 100e-6, 100, 1e-6, 2.87e9, 1e-9, 20e-9, 'y', 1, 300, 'nmr']
+        self.deer_corr_rabi_params_defaults = [12, 10, 3e-9, 100e-9, 100, 800e-9, 1e-6, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 40e-9, 0.2, 300]
+        self.deer_corr_t1_params_defaults = [12, 10, 50e-9, 1e-6, 100, self.corr_t1_array_opts, 800e-9, 2.87e9, 1e-9, 20e-9, 'y', 560e6, 40e-9, 0.2]
+        self.nmr_params_defaults = [12, 10, 50e-9, 100e-6, 100, 1e-6, 2.87e9, 1e-9, 20e-9, 'y', 1]
 
-        self.casr_params_defaults = [12, 10, 10, 1e-6, 2.87e9, 1e-9, 20e-9, 1, 300, 'casr']
+        self.casr_params_defaults = [12, 10, 10, 1e-6, 2.87e9, 1e-9, 20e-9, 1]
         
         self.exp_dict = {"Signal vs Time": ["sigvstime_scan", self.sigvstime_params_defaults],
                     "CW ODMR": ["odmr_scan", self.odmr_params_defaults],
                     "Laser": [None, self.laser_params_defaults],
-                    "CW Laser": [None, self.laser_cw_params_defaults],
                     "Digitizer": [None, self.digitizer_defaults],
                     "Pulsed ODMR": ["pulsed_odmr_scan", self.pulsed_odmr_params_defaults],
                     "Rabi": ["rabi_scan", self.rabi_params_defaults],
@@ -163,7 +161,7 @@ class ExpWidget(QWidget):
         self.params_widget = ParamsWidget(self.create_params_widget('CW ODMR', self.exp_dict['CW ODMR'][1]))
 
         self.opacity_effects = []
-        for i in range(11):
+        for i in range(13):
             self.opacity_effects.append(QGraphicsOpacityEffect())
             self.opacity_effects[i].setOpacity(0.3)
 
@@ -178,7 +176,7 @@ class ExpWidget(QWidget):
         self.save_params.setEnabled(False)
 
         # laser params widget & label
-        self.laser_params_widget = ParamsWidget(self.create_params_widget('CW Laser', self.exp_dict['CW Laser'][1]))
+        self.laser_params_widget = ParamsWidget(self.create_params_widget('Laser', self.exp_dict['Laser'][1]))
         self.laser_label = QLabel("Laser & IQ Parameters")
         self.laser_label.setFixedHeight(24)
         self.laser_label.setStyleSheet("font-weight: bold")
@@ -194,6 +192,16 @@ class ExpWidget(QWidget):
         self.dig_params_widget.setGraphicsEffect(self.opacity_effects[6])
         self.dig_params_widget.setEnabled(False)
 
+        self.daq_b1 = QRadioButton("Digitizer")
+        self.daq_b1.toggled.connect(lambda:self.toggle_daq(self.daq_b1))
+        self.daq_b1.setGraphicsEffect(self.opacity_effects[7])
+        self.daq_b1.setEnabled(False)
+
+        self.daq_b2 = QRadioButton("NI DAQ")
+        self.daq_b2.toggled.connect(lambda:self.toggle_daq(self.daq_b2))
+        self.daq_b2.setGraphicsEffect(self.opacity_effects[8])
+        self.daq_b2.setEnabled(False)
+
         # auto save checkbox
         self.auto_save_checkbox = QCheckBox("Auto Save")
         self.auto_save_checkbox.setChecked(False)
@@ -203,19 +211,19 @@ class ExpWidget(QWidget):
         self.select_dir_button = QPushButton("Select Directory")
         self.select_dir_button.setEnabled(False)
         self.select_dir_button.clicked.connect(lambda: self.select_directory())
-        self.select_dir_button.setGraphicsEffect(self.opacity_effects[7])
+        self.select_dir_button.setGraphicsEffect(self.opacity_effects[9])
 
         # selected directory display for saving
         self.chosen_dir = QLabel()
-        self.chosen_dir.setGraphicsEffect(self.opacity_effects[8])
+        self.chosen_dir.setGraphicsEffect(self.opacity_effects[10])
         self.chosen_dir.setStyleSheet("color: #ffa500")
 
         self.filename_label = QLabel("Filename: ")
-        self.filename_label.setGraphicsEffect(self.opacity_effects[9])
+        self.filename_label.setGraphicsEffect(self.opacity_effects[11])
         self.filename_label.setFixedHeight(20)
 
         self.filename_lineedit = QLineEdit()
-        self.filename_lineedit.setGraphicsEffect(self.opacity_effects[10])
+        self.filename_lineedit.setGraphicsEffect(self.opacity_effects[12])
         self.filename_lineedit.setFixedHeight(30)
         self.filename_lineedit.setEnabled(False)
 
@@ -288,10 +296,17 @@ class ExpWidget(QWidget):
         self.laser_frame.setStyleSheet("background-color: #2b2b2b")
         self.laser_params_layout = QGridLayout(self.laser_frame)
         self.laser_params_layout.setSpacing(0)
-        self.laser_params_layout.addWidget(self.laser_label,1,1,1,1)
-        self.laser_params_layout.addWidget(self.laser_params_widget,2,1,1,1)
-        self.laser_params_layout.addWidget(self.dig_label,1,2,1,1)
-        self.laser_params_layout.addWidget(self.dig_params_widget,2,2,1,1)
+        self.laser_params_layout.addWidget(self.laser_label,1,1,1,2)
+        self.laser_params_layout.addWidget(self.laser_params_widget,2,1,1,2)
+        self.laser_params_layout.addWidget(self.daq_b1,3,1,1,1)
+        self.laser_params_layout.addWidget(self.daq_b2,3,2,1,1)        
+
+        self.dig_frame = QFrame(self)
+        self.dig_frame.setStyleSheet("background-color: #2b2b2b")
+        self.dig_params_layout = QVBoxLayout(self.dig_frame)
+        self.dig_params_layout.setSpacing(0)
+        self.dig_params_layout.addWidget(self.dig_label)
+        self.dig_params_layout.addWidget(self.dig_params_widget)
         
         # self.gui_layout.addLayout(self.top_layout)
         # self.gui_layout.addLayout(self.exp_params_layout)
@@ -311,8 +326,9 @@ class ExpWidget(QWidget):
         self.exp_widgets_layout = QVBoxLayout()
         self.exp_widgets_layout.addWidget(self.exp_frame)
 
-        self.laser_widgets_layout = QVBoxLayout()
+        self.laser_widgets_layout = QHBoxLayout()
         self.laser_widgets_layout.addWidget(self.laser_frame)
+        self.laser_widgets_layout.addWidget(self.dig_frame)
 
         self.save_widgets_layout = QVBoxLayout()
         self.save_widgets_layout.addWidget(self.save_frame)
@@ -335,27 +351,23 @@ class ExpWidget(QWidget):
                 'sampling_rate': {'display_text': 'Sampling Rate: ',
                         'widget': SpinBox(value = defaults[0], suffix = 'Hz', siPrefix = True, bounds = (10, 1e6), dec = True)},
                 'sigvstime_detector': {'display_text': 'Detector: ',
-                                        'widget': ComboBox(items = defaults[1])},                
-                'dataset': {'display_text': 'Data Set',
-                        'widget': QtWidgets.QLineEdit(defaults[2])}}
+                                        'widget': ComboBox(items = defaults[1])}}
             case 'CW ODMR':    
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
-                        'freq': {'display_text': 'Center Frequency: ',
+                        'center_freq': {'display_text': 'Center Frequency: ',
                                 'widget': SpinBox(value = defaults[2], suffix = 'Hz', siPrefix = True, bounds = (100e3, 6e9), dec = True)},
-                        'max_sideband_freq': {'display_text': 'Half Frequency Span: ',
+                        'half_span_sideband_freq': {'display_text': 'Half Frequency Span: ',
                                 'widget': SpinBox(value = defaults[3], suffix = 'Hz', siPrefix = True, bounds = (100e3, 100e6), dec = True)},
                         'num_pts': {'display_text': '# Frequencies: ',
                                 'widget': SpinBox(value = defaults[4], int = True, bounds=(1, None), dec = True)},
                         'rf_power': {'display_text': 'NV MW Power: ',
                                 'widget': SpinBox(value = defaults[5], suffix = 'W', siPrefix = True)},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[6], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[7])}}
+                        'probe': {'display_text': 'MW Probe Time: ',
+                                'widget': SpinBox(value = defaults[1], suffix = 's', siPrefix = True, bounds = (10e-9, None))}}
             case 'Laser':    
                 params = {
                         'laser_power': {'display_text': 'Power (%): ',
@@ -372,24 +384,7 @@ class ExpWidget(QWidget):
                                         'widget': SpinBox(value = defaults[5], suffix = 'V', siPrefix = True)},
                         'detector': {'display_text': 'Detector: ',
                                         'widget': ComboBox(items = defaults[6])}}
-            case 'CW Laser':    
-                params = {
-                        'laser_power': {'display_text': 'Laser Power %: ',
-                                'widget': SpinBox(value = defaults[0], int = True, bounds=(0, 110), dec = True)},
-                        'probe': {'display_text': 'ODMR MW Probe Time: ',
-                                'widget': SpinBox(value = defaults[1], suffix = 's', siPrefix = True, bounds = (10e-9, None))},
-                        'sideband_freq': {'display_text': 'Sideband Mod. Frequency: ',
-                                'widget': SpinBox(value = defaults[2], suffix = 'Hz', siPrefix = True, bounds = (100, 100e6), dec = True)},
-                        'sideband_power': {'display_text': 'Sideband Power: ',
-                                        'widget': SpinBox(value = defaults[3], suffix = 'V', siPrefix = True)},
-                        'sideband': {'display_text': 'Sideband Choice: ',
-                                'widget': ComboBox(items = defaults[4])},
-                        'i_offset': {'display_text': 'I Offset: ',
-                                        'widget': SpinBox(value = defaults[5], suffix = 'V', siPrefix = True)},
-                        'q_offset': {'display_text': 'Q Offset: ',
-                                        'widget': SpinBox(value = defaults[6], suffix = 'V', siPrefix = True)},
-                        'detector': {'display_text': 'Detector: ',
-                                        'widget': ComboBox(items = defaults[7])}}
+
             
             case 'Digitizer':
                 params = {
@@ -408,27 +403,23 @@ class ExpWidget(QWidget):
 
             case 'Pulsed ODMR':    
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
-                        'freq': {'display_text': 'Center Frequency: ',
+                        'center_freq': {'display_text': 'Center Frequency: ',
                                 'widget': SpinBox(value = defaults[2], suffix = 'Hz', siPrefix = True, bounds = (100e3, 6e9), dec = True)},
-                        'max_sideband_freq': {'display_text': 'Half Frequency Span: ',
+                        'half_span_sideband_freq': {'display_text': 'Half Frequency Span: ',
                                 'widget': SpinBox(value = defaults[3], suffix = 'Hz', siPrefix = True, bounds = (100e3, 100e6), dec = True)},
                         'num_pts': {'display_text': '# Frequencies: ',
                                 'widget': SpinBox(value = defaults[4], int = True, bounds=(1, None), dec = True)},
                         'rf_power': {'display_text': 'NV MW Power: ',
                                 'widget': SpinBox(value = defaults[5], suffix = 'W', siPrefix = True)},
                         'pi': {'display_text': '\u03C0 Pulse: ',
-                                'widget': SpinBox(value = defaults[6], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[7], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[8])}}
+                                'widget': SpinBox(value = defaults[6], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)}}
             case 'Rabi':    
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -443,17 +434,12 @@ class ExpWidget(QWidget):
                         'rf_power': {'display_text': 'NV MW Power: ',
                                 'widget': SpinBox(value = defaults[6], suffix = 'W', siPrefix = True)},
                         'pulse_axis': {'display_text': 'Pulse Axis',
-                                'widget': ComboBox(items = defaults[7])},
-                        'rabi_type': {'display_text': 'Rabi Type: ',
-                                'widget': ComboBox(items = defaults[8])},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[9], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[10])}
-                    }
+                                'widget': ComboBox(items = defaults[7])}}
+                        # 'rabi_type': {'display_text': 'Rabi Type: ',
+                        #         'widget': ComboBox(items = defaults[8])}}
             case 'Optical T1':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -464,15 +450,10 @@ class ExpWidget(QWidget):
                         'num_pts': {'display_text': '# \u03C4: ',
                                 'widget': SpinBox(value = defaults[4], int = True, bounds=(1, None), dec = True)},
                         'array_type': {'display_text': 'Array Type: ',
-                                'widget': ComboBox(items = defaults[5])},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[6], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[7])}
-                    }
+                                'widget': ComboBox(items = defaults[5])}}
             case 'MW T1':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -491,15 +472,10 @@ class ExpWidget(QWidget):
                         'pi': {'display_text': '\u03C0 Pulse: ',
                                 'widget': SpinBox(value = defaults[8], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'pulse_axis': {'display_text': 'Pulse Axis',
-                                'widget': QtWidgets.QLineEdit(defaults[9])},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[10], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[11])}
-                    }
+                                'widget': QtWidgets.QLineEdit(defaults[9])}}
             case 'T2':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -522,15 +498,10 @@ class ExpWidget(QWidget):
                         't2_seq': {'display_text': 'Sequence: ',
                                 'widget': ComboBox(items = defaults[10])},
                         'n': {'display_text': '# Seqs. (n): ',
-                                'widget': SpinBox(value = defaults[11], int = True, bounds=(1, None))},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[12], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[13])}
-                    }
+                                'widget': SpinBox(value = defaults[11], int = True, bounds=(1, None))}}
             case 'DQ Relaxation':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -555,15 +526,10 @@ class ExpWidget(QWidget):
                         'pi_plus': {'display_text': '\u03C0 Pulse |+1>: ',
                                 'widget': SpinBox(value = defaults[11], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'pulse_axis': {'display_text': 'Pulse Axis',
-                                'widget': QtWidgets.QLineEdit(defaults[12])},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[13], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[14])}
-                    }
+                                'widget': QtWidgets.QLineEdit(defaults[12])}}
             case 'DEER':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -588,15 +554,10 @@ class ExpWidget(QWidget):
                         'dark_pi': {'display_text': 'Dark \u03C0 Pulse: ',
                                 'widget': SpinBox(value = defaults[11], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'drive_type': {'display_text': 'Dark MW Driving',
-                                'widget': ComboBox(items = defaults[12])},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[13], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[14])}
-                    }
+                                'widget': ComboBox(items = defaults[12])}}
             case 'DEER Rabi':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -619,15 +580,10 @@ class ExpWidget(QWidget):
                         'dark_freq': {'display_text': 'Dark Frequency: ',
                                 'widget': SpinBox(value = defaults[10], suffix = 'Hz', siPrefix = True, bounds = (100e3, 6e9), dec = True)},
                         'awg_power': {'display_text': 'Dark (AWG) Power: ',
-                                'widget': SpinBox(value = defaults[11], suffix = 'V', siPrefix = True)},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[12], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[13])}
-                    }
+                                'widget': SpinBox(value = defaults[11], suffix = 'V', siPrefix = True)}}
             case 'DEER FID':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -654,15 +610,10 @@ class ExpWidget(QWidget):
                         'dark_pi': {'display_text': 'Dark \u03C0 Pulse: ',
                                 'widget': SpinBox(value = defaults[12], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'n': {'display_text': '# Seqs. (n): ',
-                                'widget': SpinBox(value = defaults[13], int = True, bounds=(1, None))},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[14], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[15])}
-                    }  
+                                'widget': SpinBox(value = defaults[13], int = True, bounds=(1, None))}}  
             case 'DEER FID Continuous Drive':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -691,15 +642,10 @@ class ExpWidget(QWidget):
                         'awg_cd_power': {'display_text': 'Continuous Drive (AWG) Power: ',
                                 'widget': SpinBox(value = defaults[13], suffix = 'V', siPrefix = True)},
                         'n': {'display_text': '# Seqs. (n): ',
-                                'widget': SpinBox(value = defaults[14], int = True, bounds=(1, None))},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[15], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[16])}
-                    }               
+                                'widget': SpinBox(value = defaults[14], int = True, bounds=(1, None))}}               
             case 'DEER Correlation Rabi':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -726,15 +672,10 @@ class ExpWidget(QWidget):
                         'dark_pi': {'display_text': 'Dark \u03C0 Pulse: ',
                                 'widget': SpinBox(value = defaults[12], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                         'awg_power': {'display_text': 'Dark (AWG) Power: ',
-                                'widget': SpinBox(value = defaults[13], suffix = 'V', siPrefix = True)},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[14], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[15])}
-                    }
+                                'widget': SpinBox(value = defaults[13], suffix = 'V', siPrefix = True)}}
             case 'DEER T1':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -766,14 +707,10 @@ class ExpWidget(QWidget):
                                 'widget': SpinBox(value = defaults[13], suffix = 'V', siPrefix = True)},
                         # 'n': {'display_text': '# Seqs. (n): ',
                         #         'widget': SpinBox(value = defaults[14], int = True, bounds=(1, None))},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[14], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[15])}
-                    }
+                        }
             case 'DEER T2':
                 params = {
-                        'runs': {'display_text': 'Runs (per pt.): ',
+                        'runs': {'display_text': '# Averages: ',
                                 'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                         'iters': {'display_text': '# Experiment Iterations: ',
                                 'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -805,14 +742,10 @@ class ExpWidget(QWidget):
                                 'widget': SpinBox(value = defaults[13], suffix = 'V', siPrefix = True)},
                         # 'n': {'display_text': '# Seqs. (n): ',
                         #         'widget': SpinBox(value = defaults[14], int = True, bounds=(1, None))},
-                        'timeout': {'display_text': 'Exp. Timeout: ',
-                                'widget': SpinBox(value = defaults[14], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                        'dataset': {'display_text': 'Data Set',
-                                'widget': QtWidgets.QLineEdit(defaults[15])}
-                    }
+                        }
             case 'NMR: Correlation Spectroscopy':    
                 params = {
-                'runs': {'display_text': 'Runs (per pt.): ',
+                'runs': {'display_text': '# Averages: ',
                         'widget': SpinBox(value = defaults[0], int = True, bounds=(1, None))},
                 'iters': {'display_text': '# Experiment Iterations: ',
                         'widget': SpinBox(value = defaults[1], int = True, bounds=(1, None))},
@@ -835,12 +768,7 @@ class ExpWidget(QWidget):
                 # 'nmr_seq': {'display_text': 'Sequence: ',
                 #         'widget': ComboBox(items = defaults[10])},
                 'n': {'display_text': '# Seqs. (n): ',
-                        'widget': SpinBox(value = defaults[10], int = True, bounds=(1, None))},
-                'timeout': {'display_text': 'Exp. Timeout: ',
-                        'widget': SpinBox(value = defaults[11], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                'dataset': {'display_text': 'Data Set',
-                        'widget': QtWidgets.QLineEdit(defaults[12])}
-            }
+                        'widget': SpinBox(value = defaults[10], int = True, bounds=(1, None))}}
             case 'NMR: CASR':
                 params = {
                 'runs': {'display_text': 'Runs (avgs. per iteration): ',
@@ -858,12 +786,7 @@ class ExpWidget(QWidget):
                 'pi': {'display_text': '\u03C0 Pulse: ',
                         'widget': SpinBox(value = defaults[6], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
                 'n': {'display_text': 'XY8-N (# \u03C0 pulses): ',
-                        'widget': SpinBox(value = defaults[7], int = True, bounds=(1, None))},
-                'timeout': {'display_text': 'Exp. Timeout: ',
-                        'widget': SpinBox(value = defaults[8], suffix = 's', siPrefix = True, bounds = (0, None), dec = True)},
-                'dataset': {'display_text': 'Data Set',
-                        'widget': QtWidgets.QLineEdit(defaults[9])}
-            }
+                        'widget': SpinBox(value = defaults[7], int = True, bounds=(1, None))}}
     
         return params
 
@@ -891,26 +814,47 @@ class ExpWidget(QWidget):
 
         self.updateTimer.start(self.QUEUE_CHECK_TIME)
 
+    def toggle_daq(self, b):
+        match b.text():
+            case 'Digitizer':
+                if b.isChecked() == True:
+                    self.dig_params_widget.setEnabled(True)
+                    for i in [5,6]:
+                        self.opacity_effects[i].setEnabled(False)
+                else:
+                    self.dig_params_widget.setEnabled(False)
+                    for i in [5,6]:
+                        self.opacity_effects[i].setEnabled(True)
+            case 'NI DAQ':
+                if b.isChecked() == True:
+                    self.dig_params_widget.setEnabled(False)
+                    for i in [5,6]:
+                        self.opacity_effects[i].setEnabled(True)
+                else:
+                    self.dig_params_widget.setEnabled(True)
+                    for i in [5,6]:
+                        self.opacity_effects[i].setEnabled(False)
+
     def auto_save_changed(self):
         if self.auto_save_checkbox.isChecked() == True:
             self.to_save = True
             self.select_dir_button.setEnabled(True)
             self.filename_lineedit.setEnabled(True)
             self.opacity_effects[4].setEnabled(False)
-            self.opacity_effects[7].setEnabled(False)
-            self.opacity_effects[8].setEnabled(False)
             self.opacity_effects[9].setEnabled(False)
             self.opacity_effects[10].setEnabled(False)
+            self.opacity_effects[11].setEnabled(False)
+            self.opacity_effects[12].setEnabled(False)
 
         else:
             self.to_save = False
             self.select_dir_button.setEnabled(False)
             self.filename_lineedit.setEnabled(False)
             self.opacity_effects[4].setEnabled(True)
-            self.opacity_effects[7].setEnabled(True)
-            self.opacity_effects[8].setEnabled(True)
             self.opacity_effects[9].setEnabled(True)
             self.opacity_effects[10].setEnabled(True)
+            self.opacity_effects[11].setEnabled(True)
+            self.opacity_effects[12].setEnabled(True)
 
     def save_params_clicked(self):
         params = dict(**self.params_widget.all_params())
@@ -925,8 +869,8 @@ class ExpWidget(QWidget):
             case 'Rabi':
                 self.rabi_axis_opts.insert(0, self.rabi_axis_opts.pop(self.rabi_axis_opts.index(saved_params[7])))
                 saved_params[7] = self.rabi_axis_opts   
-                self.rabi_device_opts.insert(0, self.rabi_device_opts.pop(self.rabi_device_opts.index(saved_params[8])))
-                saved_params[8] = self.rabi_device_opts                
+                # self.rabi_device_opts.insert(0, self.rabi_device_opts.pop(self.rabi_device_opts.index(saved_params[8])))
+                # saved_params[8] = self.rabi_device_opts                
             case 'Optical T1':
                 self.opt_t1_array_opts.insert(0, self.opt_t1_array_opts.pop(self.opt_t1_array_opts.index(saved_params[5])))
                 saved_params[5] = self.opt_t1_array_opts
@@ -959,6 +903,7 @@ class ExpWidget(QWidget):
 
         self.exp_dict[self.experiments.currentText()][1] = saved_params
 
+
     def select_directory(self):
         response = QFileDialog.getExistingDirectory(self, caption = "Select a folder")
         
@@ -981,6 +926,10 @@ class ExpWidget(QWidget):
         self.save_params.hide()
         self.laser_label.hide()
         self.laser_params_widget.hide() 
+        self.daq_b1.hide()
+        self.daq_b2.hide()
+        self.dig_label.hide()
+        self.dig_params_widget.hide()
         
         try:
         #     print("EXPERIMENT SELECTED: ", self.experiments.currentText())
@@ -990,44 +939,54 @@ class ExpWidget(QWidget):
             # if "Select dropdown option" is selected, populate GUI with disabled ODMR widgets as filler
             self.params_widget = ParamsWidget(self.create_params_widget('CW ODMR', self.exp_dict['CW ODMR'][1]))
             self.params_widget.setGraphicsEffect(self.opacity_effects[1]) # reset opacity effects
-            self.laser_params_widget = ParamsWidget(self.create_params_widget('CW Laser', self.exp_dict['CW Laser'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
+            self.laser_params_widget = ParamsWidget(self.create_params_widget('Laser', self.exp_dict['Laser'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
             self.laser_params_widget.setGraphicsEffect(self.opacity_effects[4]) # reset opacity effects
-            self.dig_params_widget = ParamsWidget(self.create_params_widget('Digitizer', self.exp_dict['Digitizer'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
+            self.dig_params_widget = ParamsWidget(self.create_params_widget(' ', self.exp_dict['Digitizer'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
             self.dig_params_widget.setGraphicsEffect(self.opacity_effects[6]) # reset opacity effects
-            for i in range(7):
+            for i in range(9):
                 self.opacity_effects[i].setEnabled(True)
 
             self.params_widget.setEnabled(False)
             self.save_params.setEnabled(False)
             self.laser_params_widget.setEnabled(False)
+            self.daq_b1.setEnabled(False)
+            self.daq_b2.setEnabled(False)
             self.dig_params_widget.setEnabled(False)
         else:
             self.params_widget.setEnabled(True)
             self.save_params.setEnabled(True)
             self.laser_params_widget.setEnabled(True)
-            self.dig_params_widget.setEnabled(True)
-            for i in range(7):
-                self.opacity_effects[i].setEnabled(False)
+            self.daq_b1.setEnabled(True)
+            self.daq_b2.setEnabled(True)
 
-            if self.experiments.currentText() == 'CW ODMR':
-                self.laser_params_widget = ParamsWidget(self.create_params_widget('CW Laser', self.exp_dict['CW Laser'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
-                self.dig_params_widget = ParamsWidget(self.create_params_widget('Digitizer', self.exp_dict['Digitizer'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
-                self.extra_kwarg_params['odmr_type'] = "CW"
-            else:
-                if self.experiments.currentText() == 'Pulsed ODMR':
-                    self.extra_kwarg_params['odmr_type'] = "Pulsed"
+            self.laser_params_widget = ParamsWidget(self.create_params_widget('Laser', self.exp_dict['Laser'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
+            self.laser_params_widget.setGraphicsEffect(self.opacity_effects[4]) # reset opacity effects
+            self.dig_params_widget = ParamsWidget(self.create_params_widget('Digitizer', self.exp_dict['Digitizer'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
+            self.dig_params_widget.setGraphicsEffect(self.opacity_effects[6]) # reset opacity effects
+            self.dig_params_widget.setEnabled(False)
 
-                self.laser_params_widget = ParamsWidget(self.create_params_widget('Laser', self.exp_dict['Laser'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
-                self.dig_params_widget = ParamsWidget(self.create_params_widget('Digitizer', self.exp_dict['Digitizer'][1]), get_param_value_funs = {ComboBox: self.get_combobox_val})
-
+            for i in range(9):
+                if i == 5 or i == 6:
+                    if self.daq_b1.isChecked(): # digitizer settings
+                        self.opacity_effects[i].setEnabled(False)
+                        self.dig_params_widget.setEnabled(True)
+                    elif self.daq_b2.isChecked(): # NI DAQ settings
+                        self.opacity_effects[i].setEnabled(True)
+                        self.dig_params_widget.setEnabled(False)
+                else:
+                    self.opacity_effects[i].setEnabled(False)
+                    
         finally:
+            # reinstate GUI widgets
             self.exp_params_layout.insertWidget(0, self.exp_label)
             self.exp_params_layout.insertWidget(1, self.params_widget)
             self.exp_params_layout.insertWidget(2, self.save_params)
-            self.laser_params_layout.addWidget(self.laser_label,1,1,1,1)
-            self.laser_params_layout.addWidget(self.laser_params_widget,2,1,1,1)
-            self.laser_params_layout.addWidget(self.dig_label,1,2,1,1)
-            self.laser_params_layout.addWidget(self.dig_params_widget,2,2,1,1)
+            self.laser_params_layout.addWidget(self.laser_label,1,1,1,2)
+            self.laser_params_layout.addWidget(self.laser_params_widget,2,1,1,2)
+            self.laser_params_layout.addWidget(self.daq_b1,3,1,1,1)
+            self.laser_params_layout.addWidget(self.daq_b2,3,2,1,1)
+            self.dig_params_layout.insertWidget(0, self.dig_label)
+            self.dig_params_layout.insertWidget(1, self.dig_params_widget)
 
             self.exp_label.show()
             self.save_params.show()
@@ -1035,11 +994,15 @@ class ExpWidget(QWidget):
             if self.experiments.currentText() != 'Signal vs Time':
                 self.laser_label.show()
                 self.laser_params_widget.show()
+                self.daq_b1.show()
+                self.daq_b2.show()
                 self.dig_label.show()
                 self.dig_params_widget.show()
             else:
                 self.laser_label.hide()
                 self.laser_params_widget.hide()
+                self.daq_b1.hide()
+                self.daq_b2.hide()
                 self.dig_label.hide()
                 self.dig_params_widget.hide()
 
@@ -1056,9 +1019,6 @@ class ExpWidget(QWidget):
             )
             
             return
-
-        # reload the module at runtime in case any changes were made to the code
-        reload(nv_experiments_12_5_24)
         
         self.status.setStyleSheet("color: black; background-color: gold; border: 4px solid black;")
         self.status.setText(f"{self.experiments.currentText()} scan in progress...")
@@ -1081,18 +1041,38 @@ class ExpWidget(QWidget):
         # else:
         #     fun_kwargs = dict(**self.params_widget.all_params(), **self.laser_params_widget.all_params())
 
-        # call the function in a new process
-        self.run_proc.run(
+
+        # reload the module at runtime in case any changes were made to the code
+        if self.daq_b1.isChecked(): # digitizer settings
+            reload(nv_experiments_12_13_24)
+            # call the function in a new process
+            self.run_proc.run(
             run_experiment,
-            exp_cls = nv_experiments_12_5_24.SpinMeasurements,
+            exp_cls = nv_experiments_12_13_24.SpinMeasurements,
             fun_name = self.exp_dict[self.experiments.currentText()][0],
             constructor_args = list(),
             constructor_kwargs = dict(),
             queue_to_exp = self.queue_to_exp,
             queue_from_exp = self.queue_from_exp,
             fun_args = list(),
-            fun_kwargs = fun_kwargs,
-        )
+            fun_kwargs = fun_kwargs)
+        
+        elif self.daq_b2.isChecked(): # NI DAQ settings
+            reload(nv_experiments_daq)
+            # call the function in a new process
+            self.run_proc.run(
+            run_experiment,
+            exp_cls = nv_experiments_daq.SpinMeasurements,
+            fun_name = self.exp_dict[self.experiments.currentText()][0],
+            constructor_args = list(),
+            constructor_kwargs = dict(),
+            queue_to_exp = self.queue_to_exp,
+            queue_from_exp = self.queue_from_exp,
+            fun_args = list(),
+            fun_kwargs = fun_kwargs)
+
+        else:
+            raise ValueError("Must choose data acquisition method.") 
         
     def stop(self, log: bool = True):
         """Request the experiment subprocess to stop by sending the string :code:`stop`
@@ -1101,11 +1081,6 @@ class ExpWidget(QWidget):
         Args:
             log: if True, log when stop is called but the process isn't running.
         """
-
-        self.experiments.setEnabled(True)
-
-        self.status.setStyleSheet("color: black; background-color: red; border: 4px solid black;")
-        self.status.setText(f"{self.experiments.currentText()} scan stopped.")
                 
         if self.run_proc.running():
         #     self.queue_to_exp.put('stop')
@@ -1134,7 +1109,10 @@ class ExpWidget(QWidget):
                 mgr.awg.set_disabled()
                 mgr.dig.stop_card()
                 mgr.dig.reset()
+                self.experiments.setEnabled(True)
 
+                self.status.setStyleSheet("color: black; background-color: red; border: 4px solid black;")
+                self.status.setText(f"{self.experiments.currentText()} scan stopped.")
 
 class FlexLinePlotWidgetAllDefaults(FlexLinePlotWidget):
     """Add some default settings to the FlexSinkLinePlotWidget."""

@@ -133,6 +133,8 @@ class InstWidget(QWidget):
         self.init_sg396_widgets()
         self.init_laser_widgets()
         self.init_flipper_widgets()
+        self.init_apd_stage_widgets()
+        self.init_nd_filter_widgets()
         self.init_pmt_shutter_widgets()
 
         # self.obtain_current_positions() # update stage positions on GUI startup 
@@ -445,11 +447,31 @@ class InstWidget(QWidget):
         self.flipper_label.setFixedHeight(20)
         self.flipper_label.setStyleSheet("font-weight: bold")
 
-        self.flipper_b1 = QRadioButton("APD")
+        self.flipper_b1 = QRadioButton("APDs")
         self.flipper_b1.toggled.connect(lambda:self.toggle_flipper(self.flipper_b1))
             
         self.flipper_b2 = QRadioButton("PMT")
         self.flipper_b2.toggled.connect(lambda:self.toggle_flipper(self.flipper_b2))
+
+    def init_apd_stage_widgets(self):
+        self.apd_stage_label = QLabel("APD Options")
+        self.apd_stage_label.setFixedHeight(20)
+        self.apd_stage_label.setStyleSheet("font-weight: bold")
+
+        self.apd_stage_b1 = QRadioButton("Single (APD410A)")
+        self.apd_stage_b1.toggled.connect(lambda:self.toggle_apd_stage(self.apd_stage_b1))
+            
+        self.apd_stage_b2 = QRadioButton("Balanced (PDB210A)")
+        self.apd_stage_b2.toggled.connect(lambda:self.toggle_apd_stage(self.apd_stage_b2))
+
+    def init_nd_filter_widgets(self):
+        self.nd_filter_label = QLabel("ND Filter")
+        self.nd_filter_label.setFixedHeight(20)
+        self.nd_filter_label.setStyleSheet("font-weight: bold")
+        
+        self.nd_filter_opts = QComboBox()
+        self.nd_filter_opts.addItems(["None", "0.5", "1", "2", "3", "4"])
+        self.nd_filter_opts.currentIndexChanged.connect(lambda: self.nd_filter_changed())
 
     def init_pmt_shutter_widgets(self):
         self.pmt_shutter_label = QLabel("PMT Shutter")
@@ -581,14 +603,19 @@ class InstWidget(QWidget):
         self.flipper_layout.addWidget(self.flipper_label,1,1,1,2)
         self.flipper_layout.addWidget(self.flipper_b1,2,1,1,1)
         self.flipper_layout.addWidget(self.flipper_b2,2,2,1,1)
-
+        self.flipper_layout.addWidget(self.apd_stage_label,3,1,1,2)
+        self.flipper_layout.addWidget(self.apd_stage_b1,4,1,1,1)
+        self.flipper_layout.addWidget(self.apd_stage_b2,4,2,1,1)
+        
 
         self.pmt_shutter_frame = QFrame(self)
         self.pmt_shutter_frame.setStyleSheet("background-color: #454545")
         self.pmt_shutter_layout = QGridLayout(self.pmt_shutter_frame)
         self.pmt_shutter_layout.setSpacing(0)
-        self.pmt_shutter_layout.addWidget(self.pmt_shutter_label,1,1,1,2)
-        self.pmt_shutter_layout.addWidget(self.pmt_shutter_button,2,1,1,2)
+        self.pmt_shutter_layout.addWidget(self.nd_filter_label,1,1,1,2)
+        self.pmt_shutter_layout.addWidget(self.nd_filter_opts,2,1,1,2)
+        self.pmt_shutter_layout.addWidget(self.pmt_shutter_label,3,1,1,2)
+        self.pmt_shutter_layout.addWidget(self.pmt_shutter_button,4,1,1,2)
 
 
         # self.srs_frame = QFrame(self)
@@ -1103,7 +1130,7 @@ class InstWidget(QWidget):
             daq.start_do_task()
             
             match b.text():
-                case 'APD':
+                case 'APDs':
                     daq.write_do_task('flip mirror', detector='apd')
                 case 'PMT':
                     daq.write_do_task('flip mirror', detector='pmt')
@@ -1111,6 +1138,13 @@ class InstWidget(QWidget):
             daq.stop_do_task()
             daq.close_do_task()
 
+    def toggle_apd_stage(self, b):
+        with InstrumentManager() as mgr:
+            pass
+    
+    def nd_filter_changed(self):
+        self.nd_filter_choice = self.nd_filter_opts.currentText()
+        
     def pmt_shutter_status_changed(self):
         with InstrumentManager() as mgr:
             daq = mgr.daq

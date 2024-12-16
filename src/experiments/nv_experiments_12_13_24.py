@@ -99,32 +99,6 @@ class SpinMeasurements:
         #     timeout = 10,
         #     # callback = self._save_callback
         #     )
-        
-    def generate_buffer(self, exp, runs, num_pts = 0):
-        
-        if exp == 'ODMR':
-            buffer_size = 2*runs
-            if buffer_size < 2:
-                raise ValueError("Buffer size too small.")
-        
-        elif exp == 'DEER' or exp == 'DQ':
-            buffer_size = 4*runs*num_pts
-            if buffer_size < 4:
-                raise ValueError("Buffer size too small.")
-
-        elif exp == 'CD':
-            buffer_size = 6*runs*num_pts
-            if buffer_size < 6:
-                raise ValueError("Buffer size too small.")
-            
-        else: 
-            buffer_size = 2*runs*num_pts
-            if buffer_size < 2:
-                raise ValueError("Buffer size too small.")
-            
-        ni_sample_buffer = np.ascontiguousarray(np.zeros(buffer_size), dtype=np.float64)
-        
-        return [ni_sample_buffer]
     
     def analog_math(self, array, exp_type, pts = 0):        
 
@@ -404,9 +378,9 @@ class SpinMeasurements:
             delta = 0
             iq_phases = [delta+0, delta+90] # set IQ phase relations for lower sideband [lower I, lower Q]
                 
-            sig_gen_freq = kwargs['freq'] # set freq to sig gen 
+            sig_gen_freq = kwargs['center_freq'] + kwargs['half_span_sideband_freq'] # set freq to sig gen 
 
-            max_sideband_freq = kwargs['max_sideband_freq'] # set span of ODMR sweep as max sideband modulation frequency --> 100 MHz max. for SG396 IQ bandwidth
+            max_sideband_freq = 2*kwargs['half_span_sideband_freq'] # set span of ODMR sweep as max sideband modulation frequency --> 100 MHz max. for SG396 IQ bandwidth
 
             # define parameter array that will be swept over in experiment & shuffle
             mod_freqs = np.linspace(0, max_sideband_freq, kwargs['num_pts'])            
@@ -602,7 +576,7 @@ class SpinMeasurements:
                                     'num_pts': kwargs['num_pts'],
                                     'runs': kwargs['runs'], 
                                     'iters': kwargs['iters']})  
-                time.sleep(0.5)
+                time.sleep(0.1)
 
             except Exception as e:
                 print(e)
@@ -654,11 +628,11 @@ class SpinMeasurements:
                         
                         rabi_result_raw = obtain(dig.acquire()) # acquire data from digitizer
                         
-                        print("shape of raw result: ", np.shape(rabi_result_raw))
+                        # print("shape of raw result: ", np.shape(rabi_result_raw))
                         # average all data over each trigger/segment 
                         rabi_result=np.mean(rabi_result_raw,axis=1)
                         segments=(np.shape(rabi_result))[0]
-                        print("shape of result array: ", np.shape(rabi_result))
+                        # print("shape of result array: ", np.shape(rabi_result))
 
                         # partition buffer into signal and background datasets
                         sig = self.analog_math(rabi_result, 'Rabi', kwargs['num_pts'])[0]
@@ -895,9 +869,9 @@ class SpinMeasurements:
             delta = 0
             iq_phases = [delta+0, delta+90] # set IQ phase relations for lower sideband [lower I, lower Q]
                 
-            sig_gen_freq = kwargs['freq'] # set freq to sig gen 
+            sig_gen_freq = kwargs['center_freq'] + kwargs['half_span_sideband_freq'] # set freq to sig gen 
 
-            max_sideband_freq = kwargs['max_sideband_freq'] # set span of ODMR sweep as max sideband modulation frequency --> 100 MHz max. for SG396 IQ bandwidth
+            max_sideband_freq = 2*kwargs['half_span_sideband_freq'] # set span of ODMR sweep as max sideband modulation frequency --> 100 MHz max. for SG396 IQ bandwidth
 
             # define parameter array that will be swept over in experiment & shuffle
             mod_freqs = np.linspace(0, max_sideband_freq, kwargs['num_pts'])            
@@ -1173,8 +1147,6 @@ class SpinMeasurements:
                 case 'linspace':
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
 
-            np.random.shuffle(tau_times)
-
             # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq'], kwargs['pulse_axis'])
 
@@ -1217,10 +1189,6 @@ class SpinMeasurements:
                 # for storing the experiment data --> list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
                 background_sweeps = StreamingList()
-
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(tau_times) 
-                tau_times_sorted = np.sort(tau_times) # order mw_times for T1 plotting 
 
                 # open laser shutter
                 laser_shutter.open_shutter()
@@ -1270,15 +1238,11 @@ class SpinMeasurements:
                         # take absolute value of voltages    
                         sig = np.abs(sig)
                         bg = np.abs(bg)
-
-                        # correct the y-axis data ordering for plots
-                        sig = np.array([sig[i] for i in index_order])
-                        bg = np.array([bg[i] for i in index_order])
-                        
+                      
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        signal_sweeps.append(np.stack([tau_times_sorted[1:]/1e6, sig[1:]]))
+                        signal_sweeps.append(np.stack([tau_times[1:]/1e6, sig[1:]]))
                         signal_sweeps.updated_item(-1) 
-                        background_sweeps.append(np.stack([tau_times_sorted[1:]/1e6, bg[1:]]))
+                        background_sweeps.append(np.stack([tau_times[1:]/1e6, bg[1:]]))
                         background_sweeps.updated_item(-1)
 
                         # save the current data to the data server
@@ -1332,8 +1296,6 @@ class SpinMeasurements:
                     tau_times = np.geomspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
                 case 'linspace':
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
-
-            np.random.shuffle(tau_times)
 
             # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq'])
@@ -1435,10 +1397,6 @@ class SpinMeasurements:
                 signal_sweeps = StreamingList()
                 background_sweeps = StreamingList()
 
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(tau_times) 
-                tau_times_sorted = np.sort(tau_times) 
-
                 # open laser shutter
                 laser_shutter.open_shutter()
                 # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
@@ -1487,15 +1445,11 @@ class SpinMeasurements:
                         # take absolute value of voltages    
                         sig = np.abs(sig)
                         bg = np.abs(bg)
-
-                        # correct the y-axis data ordering for plots
-                        sig = np.array([sig[i] for i in index_order])
-                        bg = np.array([bg[i] for i in index_order])
                         
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        signal_sweeps.append(np.stack([tau_times_sorted, sig]))
+                        signal_sweeps.append(np.stack([tau_times, sig]))
                         signal_sweeps.updated_item(-1) 
-                        background_sweeps.append(np.stack([tau_times_sorted, bg]))
+                        background_sweeps.append(np.stack([tau_times, bg]))
                         background_sweeps.updated_item(-1)
 
                         # save the current data to the data server
@@ -1549,8 +1503,6 @@ class SpinMeasurements:
                     tau_times = np.geomspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
                 case 'linspace':
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
-
-            np.random.shuffle(tau_times)
 
             # define NV drive frequency & sideband
             if kwargs['pulse_axis'] == 'y':
@@ -1608,10 +1560,6 @@ class SpinMeasurements:
                 smm_sweeps = StreamingList()
                 smp_sweeps = StreamingList()
 
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(tau_times) 
-                tau_times_sorted = np.sort(tau_times) 
-
                 # open laser shutter
                 laser_shutter.open_shutter()
                 # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
@@ -1664,22 +1612,16 @@ class SpinMeasurements:
                         s0m = np.abs(s0m)
                         smm = np.abs(smm)
                         smp = np.abs(smp)
-
-                        # correct the y-axis data ordering for plots
-                        s00 = np.array([s00[i] for i in index_order])
-                        s0m = np.array([s0m[i] for i in index_order])
-                        smm = np.array([smm[i] for i in index_order])
-                        smp = np.array([smp[i] for i in index_order])
                         
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        s00_sweeps.append(np.stack([tau_times_sorted/1e3, s00]))
+                        s00_sweeps.append(np.stack([tau_times/1e3, s00]))
                         s00_sweeps.updated_item(-1) 
-                        s0m_sweeps.append(np.stack([tau_times_sorted/1e3, s0m]))
+                        s0m_sweeps.append(np.stack([tau_times/1e3, s0m]))
                         s0m_sweeps.updated_item(-1)
 
-                        smm_sweeps.append(np.stack([tau_times_sorted/1e3, smm]))
+                        smm_sweeps.append(np.stack([tau_times/1e3, smm]))
                         smm_sweeps.updated_item(-1) 
-                        smp_sweeps.append(np.stack([tau_times_sorted/1e3, smp]))
+                        smp_sweeps.append(np.stack([tau_times/1e3, smp]))
                         smp_sweeps.updated_item(-1)
 
                         # save the current data to the data server
@@ -2129,8 +2071,6 @@ class SpinMeasurements:
                 case 'linspace':
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
 
-            # np.random.shuffle(tau_times)
-
             # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
@@ -2191,10 +2131,6 @@ class SpinMeasurements:
                 echo_signal_sweeps = StreamingList()
                 echo_background_sweeps = StreamingList()
 
-                # sort sweep parameters back to proper plotting order
-                # index_order = np.argsort(tau_times) 
-                # tau_times_sorted = np.sort(tau_times) # order mw_times for FID plotting
-
                 # open laser shutter
                 laser_shutter.open_shutter()
                 # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
@@ -2247,12 +2183,6 @@ class SpinMeasurements:
                         dark_bg = np.abs(dark_bg)
                         echo_sig = np.abs(echo_sig)
                         echo_bg = np.abs(echo_bg)
-
-                        # correct the y-axis data ordering for plots
-                        # dark_sig = np.array([dark_sig[i] for i in index_order])
-                        # dark_bg = np.array([dark_bg[i] for i in index_order])
-                        # echo_sig = np.array([echo_sig[i] for i in index_order])
-                        # echo_bg = np.array([echo_bg[i] for i in index_order])
                         
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
                         dark_signal_sweeps.append(np.stack([tau_times, dark_sig]))
@@ -2317,8 +2247,6 @@ class SpinMeasurements:
                     tau_times = np.geomspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
                 case 'linspace':
                     tau_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
-
-            np.random.shuffle(tau_times)
 
             # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
@@ -2385,10 +2313,6 @@ class SpinMeasurements:
                 cd_signal_sweeps = StreamingList()
                 cd_background_sweeps = StreamingList()
 
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(tau_times) 
-                tau_times_sorted = np.sort(tau_times) # order mw_times for FID plotting
-
                 # open laser shutter
                 laser_shutter.open_shutter()
                 # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
@@ -2446,26 +2370,18 @@ class SpinMeasurements:
                         cd_sig = np.abs(cd_sig)
                         cd_bg = np.abs(cd_bg)
 
-                        # correct the y-axis data ordering for plots
-                        dark_sig = np.array([dark_sig[i] for i in index_order])
-                        dark_bg = np.array([dark_bg[i] for i in index_order])
-                        echo_sig = np.array([echo_sig[i] for i in index_order])
-                        echo_bg = np.array([echo_bg[i] for i in index_order])
-                        cd_sig = np.array([cd_sig[i] for i in index_order])
-                        cd_bg = np.array([cd_bg[i] for i in index_order])
-
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        dark_signal_sweeps.append(np.stack([tau_times_sorted, dark_sig]))
+                        dark_signal_sweeps.append(np.stack([tau_times, dark_sig]))
                         dark_signal_sweeps.updated_item(-1) 
-                        dark_background_sweeps.append(np.stack([tau_times_sorted, dark_bg]))
+                        dark_background_sweeps.append(np.stack([tau_times, dark_bg]))
                         dark_background_sweeps.updated_item(-1)
-                        echo_signal_sweeps.append(np.stack([tau_times_sorted, echo_sig]))
+                        echo_signal_sweeps.append(np.stack([tau_times, echo_sig]))
                         echo_signal_sweeps.updated_item(-1) 
-                        echo_background_sweeps.append(np.stack([tau_times_sorted, echo_bg]))
+                        echo_background_sweeps.append(np.stack([tau_times, echo_bg]))
                         echo_background_sweeps.updated_item(-1)
-                        cd_signal_sweeps.append(np.stack([tau_times_sorted, cd_sig]))
+                        cd_signal_sweeps.append(np.stack([tau_times, cd_sig]))
                         cd_signal_sweeps.updated_item(-1) 
-                        cd_background_sweeps.append(np.stack([tau_times_sorted, cd_bg]))
+                        cd_background_sweeps.append(np.stack([tau_times, cd_bg]))
                         cd_background_sweeps.updated_item(-1)
 
                         # save the current data to the data server
@@ -2695,8 +2611,6 @@ class SpinMeasurements:
                 case 'linspace':
                     t_corr_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts'])     
 
-            np.random.shuffle(t_corr_times)
-
             # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for y pulse by default
 
@@ -2756,10 +2670,6 @@ class SpinMeasurements:
                 with_pulse_ny_sweeps = StreamingList()
                 without_pulse_ny_sweeps = StreamingList()
 
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(t_corr_times) 
-                t_corr_times_sorted = np.sort(t_corr_times) # order mw_times for T1 plotting
-
                 # open laser shutter
                 laser_shutter.open_shutter()
                 # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
@@ -2813,20 +2723,14 @@ class SpinMeasurements:
                         with_ny = np.abs(with_ny)
                         without_ny = np.abs(without_ny)
 
-                        # correct the y-axis data ordering for plots
-                        with_py = np.array([with_py[i] for i in index_order])
-                        without_py = np.array([without_py[i] for i in index_order])
-                        with_ny = np.array([with_ny[i] for i in index_order])
-                        without_ny = np.array([without_ny[i] for i in index_order])
-
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        with_pulse_py_sweeps.append(np.stack([t_corr_times_sorted*1e6, with_py]))
+                        with_pulse_py_sweeps.append(np.stack([t_corr_times*1e6, with_py]))
                         with_pulse_py_sweeps.updated_item(-1) 
-                        without_pulse_py_sweeps.append(np.stack([t_corr_times_sorted*1e6, without_py]))
+                        without_pulse_py_sweeps.append(np.stack([t_corr_times*1e6, without_py]))
                         without_pulse_py_sweeps.updated_item(-1)
-                        with_pulse_ny_sweeps.append(np.stack([t_corr_times_sorted*1e6, with_ny]))
+                        with_pulse_ny_sweeps.append(np.stack([t_corr_times*1e6, with_ny]))
                         with_pulse_ny_sweeps.updated_item(-1) 
-                        without_pulse_ny_sweeps.append(np.stack([t_corr_times_sorted*1e6, without_ny]))
+                        without_pulse_ny_sweeps.append(np.stack([t_corr_times*1e6, without_ny]))
                         without_pulse_ny_sweeps.updated_item(-1)
 
                         # save the current data to the data server
@@ -2878,8 +2782,6 @@ class SpinMeasurements:
             
             # define parameter array that will be swept over in experiment & shuffle
             t_corr_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
-
-            np.random.shuffle(t_corr_times)
 
             # define NV drive frequency & sideband
             sig_gen_freq, iq_phases = self.choose_sideband(kwargs['sideband'], kwargs['freq'], kwargs['sideband_freq']) # iq_phases for x pulse by default
@@ -2937,10 +2839,6 @@ class SpinMeasurements:
                 signal_sweeps = StreamingList()
                 background_sweeps = StreamingList()
 
-                # sort sweep parameters back to proper plotting order
-                index_order = np.argsort(t_corr_times) 
-                t_corr_times_sorted = np.sort(t_corr_times) # order mw_times for T1 plotting
-
                 # open laser shutter
                 laser_shutter.open_shutter()
                 # daq.open_ai_task(kwargs['detector'], len(rabi_buffer[0]))
@@ -2990,14 +2888,10 @@ class SpinMeasurements:
                         sig = np.abs(sig)
                         bg = np.abs(bg)
 
-                        # correct the y-axis data ordering for plots
-                        sig = np.array([sig[i] for i in index_order])
-                        bg = np.array([bg[i] for i in index_order])
-
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
-                        signal_sweeps.append(np.stack([t_corr_times_sorted/1e3, sig]))
+                        signal_sweeps.append(np.stack([t_corr_times/1e3, sig]))
                         signal_sweeps.updated_item(-1) 
-                        background_sweeps.append(np.stack([t_corr_times_sorted/1e3, bg]))
+                        background_sweeps.append(np.stack([t_corr_times/1e3, bg]))
                         background_sweeps.updated_item(-1)
 
                         # save the current data to the data server
@@ -3047,8 +2941,6 @@ class SpinMeasurements:
             dig = mgr.dig
 
             t_corr_times = np.linspace(kwargs['start'], kwargs['stop'], kwargs['num_pts']) * 1e9
-
-            np.random.shuffle(t_corr_times)
 
             # Generate Rabi data buffer
             casr_buffer = self.generate_buffer('NMR', kwargs['runs'], kwargs['num_pts'])
@@ -3107,9 +2999,6 @@ class SpinMeasurements:
                 # list of numpy arrays of shape (2, num_points)
                 signal_sweeps = StreamingList()
                 background_sweeps = StreamingList()
-                
-                index_order = np.argsort(t_corr_times) 
-                t_corr_times_sorted = np.sort(t_corr_times) # order mw_times for T1 plotting
 
                 sig_gen.set_rf_toggle(1) # turn on NV signal generator
 
@@ -3137,16 +3026,12 @@ class SpinMeasurements:
                         sig = np.abs(sig)
                         bg = np.abs(bg)
 
-                        # correct the y-axis data ordering for plots
-                        sig = np.array([sig[i] for i in index_order])
-                        bg = np.array([bg[i] for i in index_order])
-
                         # read the analog voltage levels received by the APD.
                         # notify the streaminglist that this entry has updated so it will be pushed to the data server
                         
-                        signal_sweeps.append(np.stack([t_corr_times_sorted/1e3, sig]))
+                        signal_sweeps.append(np.stack([t_corr_times/1e3, sig]))
                         signal_sweeps.updated_item(-1) 
-                        background_sweeps.append(np.stack([t_corr_times_sorted/1e3, bg]))
+                        background_sweeps.append(np.stack([t_corr_times/1e3, bg]))
                         background_sweeps.updated_item(-1)
 
                         # save the current data to the data server.

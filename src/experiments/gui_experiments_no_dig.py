@@ -36,7 +36,7 @@ from nspyre import InstrumentManager
 
 from gui_test import Communicate 
 
-import nv_experiments_sideband
+import nv_experiments_daq
 
 class ExpWidget(QWidget):
     
@@ -1031,7 +1031,7 @@ class ExpWidget(QWidget):
             return
 
         # reload the module at runtime in case any changes were made to the code
-        reload(nv_experiments_sideband)
+        reload(nv_experiments_daq)
         
         self.status.setStyleSheet("color: black; background-color: gold; border: 4px solid black;")
         self.status.setText(f"{self.experiments.currentText()} scan in progress...")
@@ -1057,7 +1057,7 @@ class ExpWidget(QWidget):
         # call the function in a new process
         self.run_proc.run(
             run_experiment,
-            exp_cls = nv_experiments_sideband.SpinMeasurements,
+            exp_cls = nv_experiments_daq.SpinMeasurements,
             fun_name = self.exp_dict[self.experiments.currentText()][0],
             constructor_args = list(),
             constructor_kwargs = dict(),

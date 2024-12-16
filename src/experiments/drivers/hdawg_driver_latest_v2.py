@@ -223,7 +223,7 @@ class HDAWG:
 
         self.set_disabled()
 
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         match kwargs['seq']:
             case 'Test':
@@ -1141,7 +1141,7 @@ repeat({kwargs['n']}){{
         except ValueError:
             raise ValueError
         else:
-            time.sleep(1)
+            time.sleep(0.1)
             self.set_awg_enabled()
 
     def compile_sequence(self, group, program):
@@ -1221,9 +1221,9 @@ repeat({kwargs['n']}){{
 
             print("Sequence successfully uploaded.")
 
-        time.sleep(0.5)
+        time.sleep(0.1)
         self.set_group_enabled(group)
-        time.sleep(0.5)
+        time.sleep(0.1)
         self.daq.sync()
         # self.daq.syncSetInt(f"/{self.device:s}/awgs/1/enable", True)
 
